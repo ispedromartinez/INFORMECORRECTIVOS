@@ -664,9 +664,23 @@ app.get('/version', (req,res) => {
   } catch { res.json({ v: 0 }); }
 });
 
+// Resuelve un codInforme garantizando que no se repita contra los registros existentes
+async function resolveUniqueCod(base) {
+  const records = await dbClimaList(null);
+  const existing = records.map(r => r.codInforme || '').filter(c => c.startsWith(base));
+  if (!existing.length) return base;
+  let max = 1;
+  existing.forEach(c => {
+    const n = parseInt(c.slice(base.length), 10);
+    if (!isNaN(n) && n >= max) max = n + 1;
+  });
+  return `${base}${max}`;
+}
+
 app.post('/generar', async (req,res) => {
   try {
     const d = req.body;
+    d.codInforme = await resolveUniqueCod(d.codBase || d.codInforme || 'INFORME');
     const buffer = await buildDocx(d);
     const sitePart = (d.nombreSitio||'Clima').replace(/[^a-zA-Z0-9]/g,'_').slice(0,25);
     const fname = `${d.codInforme||'Informe'}_${sitePart}.docx`;

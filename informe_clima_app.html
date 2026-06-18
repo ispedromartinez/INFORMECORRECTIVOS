@@ -1564,11 +1564,12 @@ async function generateDocx(){
   const status=document.getElementById('statusMsg');
   btn.disabled=true;status.className='status loading';status.textContent='⏳ Generando código y documento...';
 
-  // Get final correlative code
-  const cod=await buildCodigoFinal()||'INFORME';
+  // Get final correlative code (preview optimista; el servidor valida y resuelve duplicados al guardar)
+  const codBase=buildCodigo()||'INFORME';
+  const cod=await buildCodigoFinal()||codBase;
 
   const payload={
-    codInforme:cod,fecha:buildFechaRango(),
+    codInforme:cod,codBase:codBase,fecha:buildFechaRango(),
     nombreSitio:document.getElementById('nombreSitio').value||siteInput.value,
     codigoSitio:g('codigoSitio'),direccion:g('direccion'),sala:g('sala'),
     tecnico:g('tecnico'),
