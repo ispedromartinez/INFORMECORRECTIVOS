@@ -107,6 +107,7 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 .foto-item .cap input{flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;background:#fff;}
 .foto-item .remove{position:absolute;top:6px;right:6px;background:rgba(220,38,38,.85);color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;z-index:4;}
 .foto-rst{position:absolute;top:6px;right:34px;background:rgba(123,31,162,.75);color:#fff;border:none;border-radius:50%;width:24px;height:24px;font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:4;line-height:1;}
+.foto-rot{position:absolute;top:6px;right:62px;background:rgba(123,31,162,.75);color:#fff;border:none;border-radius:50%;width:24px;height:24px;font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:4;line-height:1;}
 .foto-num{position:absolute;top:6px;left:6px;background:rgba(226,0,122,.85);color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:2px 6px;z-index:4;pointer-events:none;}
 .foto-count{font-size:12px;color:var(--muted);margin-bottom:10px;}
 .foto-count strong{color:var(--mag);}
@@ -589,15 +590,43 @@ let activeDrag = null;
 function applyFotoTransform(i) {
   const img = g(`foto-img-${i}`);
   if (!img) return;
-  const t = photoTransforms[i] || {x:0,y:0,scale:1};
-  img.style.transform = `translate(${t.x}px,${t.y}px) scale(${t.scale})`;
+  const t = photoTransforms[i] || {x:0,y:0,scale:1,rot:0};
+  img.style.transform = `translate(${t.x}px,${t.y}px) scale(${t.scale}) rotate(${t.rot||0}deg)`;
 }
 
 function resetFotoTransform(i, e) {
   e.stopPropagation();
-  photoTransforms[i] = {x:0,y:0,scale:1};
+  const t = photoTransforms[i] || {};
+  photoTransforms[i] = {x:0,y:0,scale:1,rot:t.rot||0};
   applyFotoTransform(i);
   saveState();
+}
+
+function rotateFoto(i, e) {
+  e.stopPropagation();
+  const t = photoTransforms[i] || (photoTransforms[i] = {x:0,y:0,scale:1,rot:0});
+  t.rot = ((t.rot||0) + 90) % 360;
+  applyFotoTransform(i);
+  saveState();
+}
+
+function getRotatedPhoto(i) {
+  const url = photos[i]; if (!url) return url;
+  const t = photoTransforms[i];
+  const rot = ((t && t.rot) || 0) % 360;
+  if (!rot) return url;
+  const img = g(`foto-img-${i}`);
+  if (!img || !img.naturalWidth) return url;
+  const iW = img.naturalWidth, iH = img.naturalHeight;
+  const swap = (rot === 90 || rot === 270);
+  const canvas = document.createElement('canvas');
+  canvas.width = swap ? iH : iW; canvas.height = swap ? iW : iH;
+  const ctx = canvas.getContext('2d');
+  ctx.translate(canvas.width/2, canvas.height/2);
+  ctx.rotate(rot * Math.PI/180);
+  ctx.drawImage(img, -iW/2, -iH/2, iW, iH);
+  try { return canvas.toDataURL('image/jpeg', 0.92); }
+  catch(e) { return url; }
 }
 
 function setupFotoInteractions() {
@@ -678,7 +707,7 @@ function addFiles(files) {
     reader.onload = e => {
       photos.push(e.target.result);
       captions.push('');
-      photoTransforms.push({x:0,y:0,scale:1});
+      photoTransforms.push({x:0,y:0,scale:1,rot:0});
       renderFotos();
       saveState();
     };
@@ -699,14 +728,15 @@ function renderFotos() {
   const grid = g('foto-grid');
   g('foto-count-n').textContent = photos.length;
   grid.innerHTML = photos.map((src, i) => {
-    const t = photoTransforms[i] || {x:0,y:0,scale:1};
+    const t = photoTransforms[i] || {x:0,y:0,scale:1,rot:0};
     return `
     <div class="foto-item">
       <div class="foto-img-wrap" id="foto-wrap-${i}">
         <span class="foto-num">#${i+1}</span>
         <button class="remove" onclick="removePhoto(${i})">✕</button>
+        <button class="foto-rot" onclick="rotateFoto(${i},event)" title="Girar 90°">↻</button>
         <button class="foto-rst" onclick="resetFotoTransform(${i},event)" title="Centrar">⟳</button>
-        <img id="foto-img-${i}" src="${src}" alt="Foto ${i+1}" style="transform:translate(${t.x}px,${t.y}px) scale(${t.scale})">
+        <img id="foto-img-${i}" src="${src}" alt="Foto ${i+1}" style="transform:translate(${t.x}px,${t.y}px) scale(${t.scale}) rotate(${t.rot||0}deg)">
       </div>
       <div class="cap">
         <input type="text" placeholder="Descripción (opcional)" value="${captions[i]||''}"
@@ -747,7 +777,7 @@ async function generarInforme() {
     modelo:        g('modelo').value.trim(),
     resumen1:      g('resumen1').value.trim(),
     resumen2:      g('resumen2').value.trim(),
-    photos,
+    photos:        photos.map((_, i) => getRotatedPhoto(i)),
     captions
   };
 
@@ -881,7 +911,7 @@ function restoreState() {
 
     photos         = s.photos         || [];
     captions       = s.captions       || [];
-    photoTransforms = s.photoTransforms || photos.map(() => ({x:0,y:0,scale:1}));
+    photoTransforms = s.photoTransforms || photos.map(() => ({x:0,y:0,scale:1,rot:0}));
     if (photos.length) renderFotos();
 
     updateEstadoActual();
