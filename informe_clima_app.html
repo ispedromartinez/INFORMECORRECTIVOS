@@ -1366,7 +1366,7 @@ function applyTransform(idx){
 function resetPhotoTransform(idx,e){
   if(e)e.stopPropagation();
   const t=photoTransforms[idx];
-  photoTransforms[idx]={x:0,y:0,scale:1,rot:t.rot||0,refW:t.refW,refH:t.refH};
+  photoTransforms[idx]={x:0,y:0,scale:1,rot:t.rot||0};
   applyTransform(idx);
 }
 function rotatePhoto(idx,e){
@@ -1375,29 +1375,6 @@ function rotatePhoto(idx,e){
   const t=photoTransforms[idx];
   t.rot=((t.rot||0)+90)%360;
   applyTransform(idx);
-}
-function getPhotoForExport(idx){
-  if(!photoDataUrls[idx])return null;
-  const img=document.getElementById(`img${idx}`);
-  if(!img||!img.naturalWidth||!img.naturalHeight)return photoDataUrls[idx];
-  const t=photoTransforms[idx];
-  // Dimensiones fijas 4:3 para el Word — independiente de si el tab está visible
-  const EW=800,EH=600;
-  const refW=t.refW||EW, refH=t.refH||EH;
-  // Escalar la traslación del slot visual al canvas de exportación
-  const tx=t.x*(EW/refW), ty=t.y*(EH/refH);
-  const canvas=document.createElement('canvas');
-  canvas.width=EW;canvas.height=EH;
-  const ctx=canvas.getContext('2d');
-  const iW=img.naturalWidth,iH=img.naturalHeight;
-  const bs=Math.min(EW/iW,EH/iH);
-  ctx.save();
-  ctx.translate(EW/2+tx,EH/2+ty);
-  ctx.scale(t.scale,t.scale);
-  ctx.drawImage(img,-(iW*bs)/2,-(iH*bs)/2,iW*bs,iH*bs);
-  ctx.restore();
-  try{return canvas.toDataURL('image/jpeg',0.92);}
-  catch(e){return photoDataUrls[idx];}
 }
 function getRotatedDataUrl(idx){
   const url=photoDataUrls[idx];if(!url)return null;
@@ -1510,9 +1487,7 @@ function loadPhotoFile(idx,file,focusDesc){
     im.src=ev.target.result;
     const sl=document.getElementById(`slot${idx}`);
     sl.classList.add('filled');
-    // Guardar dimensiones del slot mientras el tab está visible
-    const refW=sl.clientWidth||200, refH=sl.clientHeight||150;
-    photoTransforms[idx]={x:0,y:0,scale:1,rot:0,refW,refH};
+    photoTransforms[idx]={x:0,y:0,scale:1,rot:0};
     im.style.transform='';
     document.getElementById('photoTabNum').textContent=photoFiles.filter(Boolean).length;
     updateEstadoActual();
