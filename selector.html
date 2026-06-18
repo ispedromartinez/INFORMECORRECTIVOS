@@ -6,11 +6,11 @@
 <title>ICETEL – Selección de Proyecto</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600;700&family=Poppins:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{
-  font-family:'Poppins',system-ui,sans-serif;
+  font-family:'Fira Sans',system-ui,sans-serif;
   min-height:100vh;
   background:#F6F7FB;
   display:flex;
@@ -53,6 +53,7 @@ header{
   bottom:-100px;right:-80px;pointer-events:none;
 }
 .hero h1{
+  font-family:'Poppins',system-ui,sans-serif;
   font-size:28px;font-weight:800;color:#fff;
   letter-spacing:-.4px;margin-bottom:10px;
   position:relative;z-index:1;
@@ -141,6 +142,7 @@ main{
 }
 
 .card-label{
+  font-family:'Poppins',system-ui,sans-serif;
   font-size:13px;font-weight:700;color:#323338;letter-spacing:.2px;text-transform:uppercase;
 }
 .card-desc{
@@ -154,7 +156,7 @@ main{
   border-radius:8px;
   font-size:13px;font-weight:600;font-family:'Poppins',sans-serif;
   border:none;cursor:pointer;
-  transition:opacity .15s, transform .1s;
+  transition:opacity .15s, transform 160ms cubic-bezier(.23,1,.32,1);
   letter-spacing:.1px;
 }
 .card-btn:hover{opacity:.88;}
@@ -165,7 +167,7 @@ main{
 /* ── FOOTER ── */
 footer{
   padding:20px;
-  color:#B0B3C0;
+  color:#6B7280;
   font-size:11px;
   font-weight:400;
   text-align:center;
@@ -178,6 +180,12 @@ footer{
   .hero h1{font-size:22px;}
   .card-btn{font-size:12px;}
 }
+
+@keyframes fadeInUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.card{animation:fadeInUp 320ms cubic-bezier(.23,1,.32,1) backwards;}
+.card.tigo{animation-delay:0ms;}
+.card.wom{animation-delay:50ms;}
+@media (prefers-reduced-motion: reduce){.card{animation:none;}}
 </style>
 </head>
 <body>
