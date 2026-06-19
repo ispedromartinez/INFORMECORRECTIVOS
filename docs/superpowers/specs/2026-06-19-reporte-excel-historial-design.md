@@ -32,19 +32,27 @@ cambio.
 
 ## UI
 
-**Boton:** "📊 Reporte" junto al boton de refresh (`.btn-refresh`) en
-`.hist-search-wrap`, mismo estilo `.btn-refresh`.
+**Boton:** "📊 Reporte". En Tigo, junto al boton de refresh (`.btn-refresh`)
+dentro de `.hist-search-wrap`, mismo estilo `.btn-refresh`. En WOM, dentro
+de `.hist-header` junto a `.hist-count`, estilo `.btn-dl` (reusa esa
+clase, ya tiene look de boton secundario con acento magenta).
 
-**Modal** (reusa estructura `.modal-overlay`/`.modal-box` ya existente en
-ambas apps):
+**Modal** (Tigo ya tiene `.modal-overlay`/`.modal-box`/`.modal-title`/
+`.modal-close` — se reusa tal cual. WOM no tiene ninguna infraestructura
+de modal hoy, solo `confirm()` nativo del navegador para borrar; como el
+checklist necesita DOM real, se agregan las mismas clases CSS a WOM
+copiando el patron de Tigo, con acento `--mag` en vez de `--blue`):
 - Titulo: "Generar reporte Excel"
 - Seccion 1 "Columnas": checkbox por cada campo exportable (lista de
   arriba), todos marcados por defecto.
-- Seccion 2 "Informes a incluir": checkbox por cada informe actualmente
-  visible en Historial (respeta el filtro de busqueda activo al momento
-  de abrir el modal — usa el array ya cargado en memoria, no vuelve a
-  pedir al servidor), todos marcados por defecto. Cada item muestra
-  sitio/ticket + fecha para identificarlo.
+- Seccion 2 "Informes a incluir": checkbox por cada informe. En Tigo,
+  respeta el filtro de busqueda activo en `#histSearch` al momento de
+  abrir el modal (reusa `allRecords` ya cargado en memoria, mismo filtro
+  que `filterHist`, sin pedir de nuevo al servidor). WOM no tiene barra
+  de busqueda en Historial hoy, asi que su modal simplemente lista todos
+  los informes (pide `/registro-wom` al abrir, igual que `loadHistorial`
+  ya hace). Todos marcados por defecto. Cada item muestra sitio/ticket +
+  fecha para identificarlo.
 - Boton "Generar Excel": deshabilitado si no hay columnas o informes
   marcados. Dispara la descarga y cierra el modal.
 - Boton cerrar (X), igual que otros modales.
