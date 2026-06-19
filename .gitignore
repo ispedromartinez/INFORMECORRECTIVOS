@@ -2,9 +2,6 @@ node_modules/
 .env
 informes/
 papelera/
-papelera_wom/
-.agents/
-skills-lock.json
 registro.json
 papelera.json
 informes_wom/

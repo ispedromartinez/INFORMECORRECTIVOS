@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
@@ -25,40 +24,7 @@ if (supabase) {
 }
 
 const app = express();
-
-const PORT_FOR_CORS = process.env.PORT || 3000;
-const allowedOrigins = [
-  `http://localhost:${PORT_FOR_CORS}`,
-  `http://127.0.0.1:${PORT_FOR_CORS}`,
-  'null', // file:// (HTML abierto directo con doble clic, ver LEEME.txt)
-  ...(process.env.ALLOWED_ORIGIN ? [process.env.ALLOWED_ORIGIN] : []),
-];
-const lanOriginPattern = new RegExp(`^http://192\\.168\\.\\d{1,3}\\.\\d{1,3}:${PORT_FOR_CORS}$`);
-
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || lanOriginPattern.test(origin)) {
-      return callback(null, true);
-    }
-    callback(new Error('Origen no permitido por CORS: ' + origin));
-  },
-}));
-const generalLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Demasiadas peticiones, intenta de nuevo en un momento.' },
-});
-const heavyLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Demasiadas peticiones a este endpoint, intenta de nuevo en un momento.' },
-});
-
-app.use(generalLimiter);
+app.use(cors());
 app.use(express.json({ limit: '80mb' }));
 app.use(express.static(__dirname));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'selector.html')));
@@ -151,10 +117,10 @@ async function dbClimaList(q) {
 async function dbClimaInsert(entry) {
   if (supabase) {
     const { error } = await supabase.from('informes_clima').insert(toClima(entry));
-    if (!error) return;
-    console.error('dbClimaInsert:', error.message);
+    if (error) console.error('dbClimaInsert:', error.message);
+  } else {
+    const db = loadDBLocal(); db.unshift(entry); saveDBLocal(db);
   }
-  const db = loadDBLocal(); db.unshift(entry); saveDBLocal(db);
 }
 
 async function dbClimaFind(id) {
@@ -500,11 +466,6 @@ async function buildDocx(d) {
     VC(v(d.numOT), w_tk_otv, 2)
   ]});
 
-  const row_lpu = new TableRow({ height:{value:280}, children:[
-    LC('LPU', w_tk_label, 2),
-    VC(v(d.lpu), TW-w_tk_label, 12)
-  ]});
-
   const row_sala = new TableRow({ height:{value:280}, children:[
     LC('Sala', w_tk_label, 2),
     VC(v(d.sala), w_tk_inc+w_tk_te+w_tk_ti+w_tk_red, 8),
@@ -632,7 +593,7 @@ async function buildDocx(d) {
     width: { size: TW, type: WidthType.DXA },
     columnWidths: scaled,
     rows: [
-      row_ig, row_sitio, row_dir, row_tk, row_tk2, row_lpu, row_sala, row_tec,
+      row_ig, row_sitio, row_dir, row_tk, row_tk2, row_sala, row_tec,
       row_rs, row_rs2,
       row_eq, row_eq_h, row_eq_d,
       row_med, row_med_h1, row_med_h2, row_med_d,
@@ -703,23 +664,9 @@ app.get('/version', (req,res) => {
   } catch { res.json({ v: 0 }); }
 });
 
-// Resuelve un codInforme garantizando que no se repita contra los registros existentes
-async function resolveUniqueCod(base) {
-  const records = await dbClimaList(null);
-  const existing = records.map(r => r.codInforme || '').filter(c => c.startsWith(base));
-  if (!existing.length) return base;
-  let max = 1;
-  existing.forEach(c => {
-    const n = parseInt(c.slice(base.length), 10);
-    if (!isNaN(n) && n >= max) max = n + 1;
-  });
-  return `${base}${max}`;
-}
-
-app.post('/generar', heavyLimiter, async (req,res) => {
+app.post('/generar', async (req,res) => {
   try {
     const d = req.body;
-    d.codInforme = await resolveUniqueCod(d.codBase || d.codInforme || 'INFORME');
     const buffer = await buildDocx(d);
     const sitePart = (d.nombreSitio||'Clima').replace(/[^a-zA-Z0-9]/g,'_').slice(0,25);
     const fname = `${d.codInforme||'Informe'}_${sitePart}.docx`;
@@ -764,7 +711,7 @@ app.get('/descargar/:id', async (req,res) => {
   res.send(buffer);
 });
 
-app.post('/enviar/:id', heavyLimiter, async (req,res) => {
+app.post('/enviar/:id', async (req,res) => {
   const entry = await dbClimaFind(req.params.id);
   if (!entry) return res.status(404).json({error:'No encontrado'});
   let buffer = await storageDownload(`clima/${entry.filename}`);
@@ -894,10 +841,10 @@ async function dbWomList() {
 async function dbWomInsert(entry) {
   if (supabase) {
     const { error } = await supabase.from('informes_wom').insert(toWom(entry));
-    if (!error) return;
-    console.error('dbWomInsert:', error.message);
+    if (error) console.error('dbWomInsert:', error.message);
+  } else {
+    const db = loadDBWomLocal(); db.unshift(entry); saveDBWomLocal(db);
   }
-  const db = loadDBWomLocal(); db.unshift(entry); saveDBWomLocal(db);
 }
 
 async function dbWomFind(id) {
@@ -1477,7 +1424,7 @@ async function buildDocxWom_UNUSED(d) {
 app.get('/sitios-rso', (_req, res) => res.json(RSO_SITES));
 app.get('/actividades-wom', (_req, res) => res.json(ACTIVIDADES_WOM));
 
-app.post('/generar-wom', heavyLimiter, async (req, res) => {
+app.post('/generar-wom', async (req, res) => {
   try {
     const d = req.body;
     const buffer = await buildDocxWom(d);

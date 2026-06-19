@@ -6,7 +6,7 @@
 <title>Informe WOM – ICETEL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600;700;800&family=Poppins:wght@700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
   --mag:#784BD1; --mag-d:#4A148C; --mag-l:#EDE7F6; --mag-b:#B39DDB;
@@ -17,8 +17,7 @@
   --max-w:860px;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{font-family:'Fira Sans',system-ui,sans-serif;background:#F6F7FB;color:var(--text);min-height:100vh;}
-.hdr-left h1{font-family:'Poppins',system-ui,sans-serif;}
+body{font-family:'Poppins',system-ui,sans-serif;background:#F6F7FB;color:var(--text);min-height:100vh;}
 
 /* ── HEADER ── */
 header{background:#1C1F3B;color:#fff;padding:13px 18px 11px;position:sticky;top:0;z-index:200;box-shadow:0 2px 12px rgba(0,0,0,.25);border-bottom:3px solid #784BD1;}
@@ -26,11 +25,10 @@ header{background:#1C1F3B;color:#fff;padding:13px 18px 11px;position:sticky;top:
 .hdr-left{display:flex;align-items:center;gap:12px;}
 .hdr-gear{font-size:24px;line-height:1;opacity:.92;flex-shrink:0;}
 .hdr-left h1{font-size:15px;font-weight:700;letter-spacing:-.2px;}
-.hdr-left p{font-size:14px;opacity:.65;margin-top:2px;}
+.hdr-left p{font-size:11px;opacity:.65;margin-top:2px;}
 .hdr-right{display:flex;align-items:center;gap:8px;}
-.back-btn{display:inline-flex;align-items:center;justify-content:center;color:#fff;text-decoration:none;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:7px 9px;transition:background .15s,border-color .15s,transform 160ms cubic-bezier(.23,1,.32,1);}
+.back-btn{display:inline-flex;align-items:center;justify-content:center;color:#fff;text-decoration:none;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:7px 9px;transition:background .15s,border-color .15s;}
 .back-btn:hover{background:rgba(255,255,255,.24);border-color:rgba(255,255,255,.4);}
-.back-btn:active{transform:scale(.92);}
 .back-btn svg{display:block;}
 .hdr-logo-pill{background:#fff;border-radius:8px;padding:5px 12px;display:flex;align-items:center;flex-shrink:0;}
 .hdr-logo-app{height:28px;object-fit:contain;display:block;}
@@ -56,10 +54,7 @@ header{background:#1C1F3B;color:#fff;padding:13px 18px 11px;position:sticky;top:
 
 /* ── MAIN ── */
 main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
-.panel{display:none;}
-.panel.active{display:block;animation:panelIn 140ms ease-out;}
-@keyframes panelIn{from{opacity:0}to{opacity:1}}
-@media (prefers-reduced-motion:reduce){.panel.active{animation:none;}}
+.panel{display:none;} .panel.active{display:block;}
 
 /* ── CARDS ── */
 .card{background:#fff;border-radius:var(--r);box-shadow:var(--sh);padding:18px;margin-bottom:14px;border:1px solid var(--border);}
@@ -73,13 +68,13 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--mag);box-shadow:0 0 0 3px rgba(120,75,209,.12);}
 .field input:read-only{background:#f8fafc;color:var(--muted);}
 .field textarea{resize:vertical;min-height:90px;line-height:1.5;}
-.field select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;}
+.field select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;}
 .row-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
 .row-dt{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;}
 
 /* Cliente badge */
-.cliente-badge{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:15px;font-weight:700;color:var(--mag);width:100%;border-bottom:1px solid var(--border);}
+.cliente-badge{display:inline-flex;align-items:center;gap:8px;background:var(--mag-l);border:1.5px solid var(--mag-b);border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;color:var(--mag);width:100%;}
 .cliente-badge span{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-right:auto;}
 
 /* INC preview */
@@ -88,12 +83,10 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 /* ── TÉCNICOS ── */
 .tecnico-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
 .tecnico-row input{flex:1;}
-.btn-icon{background:none;border:none;cursor:pointer;padding:6px;border-radius:6px;color:var(--muted);font-size:16px;transition:background .15s,color .15s,transform 160ms cubic-bezier(.23,1,.32,1);}
+.btn-icon{background:none;border:none;cursor:pointer;padding:6px;border-radius:6px;color:var(--muted);font-size:16px;transition:background .15s,color .15s;}
 .btn-icon:hover{background:#f1f5f9;color:var(--red);}
-.btn-icon:active{transform:scale(.9);}
-.btn-add-tec{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--mag);background:var(--mag-l);border:1.5px dashed var(--mag-b);border-radius:8px;padding:9px 14px;cursor:pointer;width:100%;justify-content:center;margin-top:4px;transition:background .15s,transform 160ms cubic-bezier(.23,1,.32,1);}
+.btn-add-tec{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--mag);background:var(--mag-l);border:1.5px dashed var(--mag-b);border-radius:8px;padding:9px 14px;cursor:pointer;width:100%;justify-content:center;margin-top:4px;transition:background .15s;}
 .btn-add-tec:hover{background:#f9d0e8;}
-.btn-add-tec:active{transform:scale(.97);}
 
 /* ── RESUMEN ── */
 .resumen-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
@@ -101,13 +94,14 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 @media(max-width:580px){.resumen-grid{grid-template-columns:1fr;}.row-2,.row-3{grid-template-columns:1fr;}}
 
 /* ── FOTOS ── */
-.drop-zone{border:2px dashed var(--mag-b);padding:28px 20px;text-align:center;cursor:pointer;transition:border-color .18s,background .18s;margin-bottom:16px;}
+.drop-zone{border:2px dashed var(--mag-b);border-radius:var(--r);background:var(--mag-l);padding:28px 20px;text-align:center;cursor:pointer;transition:border-color .18s,background .18s;margin-bottom:16px;}
 .drop-zone:hover,.drop-zone.over{border-color:var(--mag);background:#fce4f3;}
 .drop-zone p{color:var(--mag);font-size:13px;font-weight:600;margin-top:8px;}
-.drop-zone small{color:var(--muted);font-size:14px;}
+.drop-zone small{color:var(--muted);font-size:11px;}
 .drop-icon{font-size:32px;}
 .foto-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.foto-img-wrap{position:relative;width:100%;height:140px;overflow:hidden;background:#f0f0f0;border-radius:10px;}
+.foto-item{background:#f8fafc;border-radius:10px;border:1.5px solid var(--border);}
+.foto-img-wrap{position:relative;width:100%;height:140px;overflow:hidden;background:#f0f0f0;border-radius:10px 10px 0 0;}
 .foto-item img{width:100%;height:100%;object-fit:contain;position:absolute;inset:0;cursor:grab;transform-origin:center;user-select:none;display:block;}
 .foto-item .cap{padding:8px;display:flex;gap:6px;align-items:center;}
 .foto-item .cap input{flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;background:#fff;}
@@ -121,9 +115,9 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 /* ── BOTONES ACCIÓN ── */
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;justify-content:space-between;align-items:center;}
 .actions-right{display:flex;gap:10px;justify-content:flex-end;margin-top:6px;}
-.btn{display:inline-flex;align-items:center;gap:7px;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:opacity .15s,transform 160ms cubic-bezier(.23,1,.32,1);letter-spacing:.1px;}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:opacity .15s,transform .1s;letter-spacing:.1px;}
 .btn:active{transform:scale(.97);}
-.btn-primary{background:var(--mag);color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.15);}
+.btn-primary{background:var(--mag);color:#fff;box-shadow:0 4px 14px rgba(120,75,209,.25);}
 .btn-primary:hover{opacity:.9;}
 .btn-secondary{background:#fff;color:var(--mag);border:1.5px solid var(--border);}
 .btn-secondary:hover{background:var(--mag-l);border-color:var(--mag-b);}
@@ -139,38 +133,24 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 .hist-row:hover{background:#fdf2f8;}
 .hist-info{flex:1;min-width:0;}
 .hist-ticket{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.hist-sub{font-size:14px;color:var(--muted);margin-top:2px;}
+.hist-sub{font-size:11px;color:var(--muted);margin-top:2px;}
 .hist-inc{font-size:11px;font-weight:700;color:#2E7D32;}
 .hist-actions{display:flex;gap:6px;flex-shrink:0;}
-.btn-dl{background:var(--mag-l);color:var(--mag);border:1.5px solid var(--mag-b);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;transition:background .15s,transform 160ms cubic-bezier(.23,1,.32,1);}
+.btn-dl{background:var(--mag-l);color:var(--mag);border:1.5px solid var(--mag-b);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;transition:background .15s;}
 .btn-dl:hover{background:#f9d0e8;}
-.btn-dl:active{transform:scale(.97);}
-.btn-del{background:#fff0f0;color:var(--red);border:1.5px solid #fecaca;border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer;transition:background .15s,transform 160ms cubic-bezier(.23,1,.32,1);}
+.btn-del{background:#fff0f0;color:var(--red);border:1.5px solid #fecaca;border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer;transition:background .15s;}
 .btn-del:hover{background:#fee2e2;}
-.btn-del:active{transform:scale(.97);}
-.hist-empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;}
+.hist-empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.07),0 4px 16px rgba(0,0,0,.05);}
 
 /* ── TOAST ── */
-#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);opacity:0;background:#1e293b;color:#fff;padding:12px 22px;border-radius:50px;font-size:13px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.25);transition:transform 180ms cubic-bezier(.23,1,.32,1),opacity 180ms ease;z-index:9999;pointer-events:none;white-space:nowrap;}
-#toast.show{transform:translateX(-50%) translateY(0);opacity:1;transition:transform 260ms cubic-bezier(.23,1,.32,1),opacity 260ms ease;}
-@media (prefers-reduced-motion:reduce){#toast{transition:opacity 180ms ease;}#toast.show{transition:opacity 260ms ease;}}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:#1e293b;color:#fff;padding:12px 22px;border-radius:50px;font-size:13px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.25);transition:transform .3s ease;z-index:9999;pointer-events:none;white-space:nowrap;}
+#toast.show{transform:translateX(-50%) translateY(0);}
 #toast.ok{background:#15803d;}
 #toast.err{background:#dc2626;}
 
 /* ── SPINNER ── */
 .spinner{display:inline-block;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
-
-/* ── ENTRANCE STAGGER ── */
-@keyframes fadeInUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
-.hist-row,.foto-item{animation:fadeInUp 280ms cubic-bezier(.23,1,.32,1) backwards;}
-.hist-row:nth-child(1),.foto-item:nth-child(1){animation-delay:0ms;}
-.hist-row:nth-child(2),.foto-item:nth-child(2){animation-delay:40ms;}
-.hist-row:nth-child(3),.foto-item:nth-child(3){animation-delay:80ms;}
-.hist-row:nth-child(4),.foto-item:nth-child(4){animation-delay:120ms;}
-.hist-row:nth-child(5),.foto-item:nth-child(5){animation-delay:160ms;}
-.hist-row:nth-child(n+6),.foto-item:nth-child(n+6){animation-delay:200ms;}
-@media (prefers-reduced-motion: reduce){.hist-row,.foto-item{animation:none;}}
 </style>
 </head>
 <body>
@@ -182,7 +162,7 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
       <span class="hdr-sep"></span>
       <div>
         <h1>Informe de Trabajos WOM</h1>
-        <p>WOM, Mantenimiento Clima</p>
+        <p>WOM — Mantenimiento Clima</p>
       </div>
     </div>
     <div class="hdr-right">
@@ -313,7 +293,7 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
     <div class="field">
       <label>Tipo de Actividad <span style="color:var(--red)">*</span></label>
       <select id="tipo-actividad">
-        <option value="">Seleccionar...</option>
+        <option value="">— Seleccionar —</option>
         <option>Trabajo Correctivo</option>
         <option>Mantenimiento preventivo</option>
         <option>Atención de emergencia</option>
@@ -326,7 +306,7 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
       <div class="field">
         <label>Instalación (RSO) <span style="color:var(--red)">*</span></label>
         <select id="instalacion" onchange="onSiteChange()">
-          <option value="">Seleccionar sitio...</option>
+          <option value="">— Seleccionar sitio —</option>
           <option value="RSO CONCEPCION">RSO CONCEPCION</option>
           <option value="RSO ANTOFAGASTA">RSO ANTOFAGASTA</option>
           <option value="RSO PUERTO MONTT">RSO PUERTO MONTT</option>
@@ -441,14 +421,13 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 
 </main>
 
-<footer style="text-align:center;padding:14px 16px;font-size:11px;color:rgba(71,85,105,.85);pointer-events:none;">
-  Creado por: Pedro Martinez · ICETEL &copy; 2026
+<footer style="text-align:center;padding:14px 16px;font-size:11px;color:rgba(100,116,139,.45);pointer-events:none;">
+  Creado por: Pedro Martinez — ICETEL &copy; 2026
 </footer>
 
 <div id="toast"></div>
 
 <script>
-const SERVER=location.protocol==='file:'?'http://localhost:3000':window.location.origin;
 // ── RSO sites map ────────────────────────────────────────────
 const RSO = {
   'RSO CONCEPCION':   'ANIBAL PINTO 105, CONCEPCION',
@@ -573,7 +552,7 @@ function updateBadge() { /* dot reflects server, not ticket */ }
 async function checkServer() {
   const dot = g('badge-estado');
   try {
-    const r = await fetch(`${SERVER}/ping`, { signal: AbortSignal.timeout(2000) });
+    const r = await fetch('/ping', { signal: AbortSignal.timeout(2000) });
     if (r.ok) { dot.className = 'srv-dot on'; dot.title = 'Servidor activo'; }
     else throw new Error();
   } catch(e) {
@@ -803,7 +782,7 @@ async function generarInforme() {
   };
 
   try {
-    const resp = await fetch(`${SERVER}/generar-wom`, {
+    const resp = await fetch('/generar-wom', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -834,7 +813,7 @@ async function loadHistorial() {
   if (!body) return;
   body.innerHTML = '<div class="hist-empty">Cargando...</div>';
   try {
-    const data = await fetch(`${SERVER}/registro-wom`).then(r=>r.json());
+    const data = await fetch('/registro-wom').then(r=>r.json());
     g('hist-count').textContent = `${data.length} informe(s)`;
     if (!data.length) { body.innerHTML = '<div class="hist-empty">No hay informes generados aún.</div>'; return; }
     body.innerHTML = data.map(e => `
@@ -856,14 +835,14 @@ async function loadHistorial() {
 }
 
 async function descargar(id) {
-  window.location.href = `${SERVER}/descargar-wom/${id}`;
+  window.location.href = `/descargar-wom/${id}`;
 }
 
 async function eliminar(id, btn) {
   if (!confirm('¿Mover este informe a la papelera?')) return;
   btn.disabled = true;
   try {
-    await fetch(`${SERVER}/registro-wom/${id}`, { method:'DELETE' });
+    await fetch(`/registro-wom/${id}`, { method:'DELETE' });
     toast('Informe movido a papelera');
     loadHistorial();
   } catch { toast('Error al eliminar','err'); btn.disabled = false; }
