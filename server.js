@@ -4,6 +4,7 @@ const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const XLSX = require('xlsx');
 const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
@@ -833,6 +834,32 @@ app.delete('/papelera', async (req,res) => {
   res.json({ok:true});
 });
 
+const REPORTE_COLUMNAS_CLIMA = {
+  fecha: 'Fecha', codInforme: 'Código Informe', nombreSitio: 'Sitio',
+  codigoSitio: 'Código Sitio', tecnico: 'Técnico', supervisor: 'Supervisor',
+  numOT: 'OT', photoCount: 'Cant. Fotos'
+};
+
+app.post('/reporte', async (req, res) => {
+  const { columns, ids } = req.body;
+  if (!Array.isArray(columns) || !columns.length || !Array.isArray(ids) || !ids.length) {
+    return res.status(400).json({ error: 'Selecciona al menos una columna y un informe' });
+  }
+  const validColumns = columns.filter(c => REPORTE_COLUMNAS_CLIMA[c]);
+  if (!validColumns.length) return res.status(400).json({ error: 'Columnas inválidas' });
+  const all = await dbClimaList(null);
+  const selected = all.filter(r => ids.includes(r.id));
+  const headerRow = validColumns.map(c => REPORTE_COLUMNAS_CLIMA[c]);
+  const dataRows = selected.map(r => validColumns.map(c => r[c] ?? ''));
+  const ws = XLSX.utils.aoa_to_sheet([headerRow, ...dataRows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Historial');
+  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="reporte-tigo.xlsx"');
+  res.send(buffer);
+});
+
 // ═══════════════════════════════════════════════════════════════
 // MÓDULO WOM
 // ═══════════════════════════════════════════════════════════════
@@ -1561,6 +1588,32 @@ app.delete('/papelera-wom', async (_req, res) => {
   }
   await dbPapeleraWomClear();
   res.json({ok:true});
+});
+
+const REPORTE_COLUMNAS_WOM = {
+  fechaInicio: 'Fecha Inicio', ticket: 'Ticket', codInterno: 'Código Interno',
+  instalacion: 'Instalación', tipoActividad: 'Tipo Actividad',
+  tecnicos: 'Técnicos', photoCount: 'Cant. Fotos'
+};
+
+app.post('/reporte-wom', async (req, res) => {
+  const { columns, ids } = req.body;
+  if (!Array.isArray(columns) || !columns.length || !Array.isArray(ids) || !ids.length) {
+    return res.status(400).json({ error: 'Selecciona al menos una columna y un informe' });
+  }
+  const validColumns = columns.filter(c => REPORTE_COLUMNAS_WOM[c]);
+  if (!validColumns.length) return res.status(400).json({ error: 'Columnas inválidas' });
+  const all = await dbWomList();
+  const selected = all.filter(r => ids.includes(r.id));
+  const headerRow = validColumns.map(c => REPORTE_COLUMNAS_WOM[c]);
+  const dataRows = selected.map(r => validColumns.map(c => r[c] ?? ''));
+  const ws = XLSX.utils.aoa_to_sheet([headerRow, ...dataRows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Historial');
+  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="reporte-wom.xlsx"');
+  res.send(buffer);
 });
 
 const PORT = process.env.PORT || 3000;
