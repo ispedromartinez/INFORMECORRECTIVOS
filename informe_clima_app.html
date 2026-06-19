@@ -429,6 +429,7 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
       </div>
     </div>
     <div class="field"><label>Número de OT</label><input type="text" id="numOT" placeholder="OT-0000"></div>
+    <div class="field"><label>LPU</label><input type="text" id="lpu" placeholder="LPU-0000"></div>
     <div class="field">
       <label>Código de Informe <small style="text-transform:none;letter-spacing:0;color:#aaa">(se genera automáticamente)</small></label>
       <div class="cod-auto" id="codPreview">— <small>Completa los campos para previsualizar</small></div>
@@ -1203,7 +1204,7 @@ function previewCod(){
 // ══ NUEVO INFORME ══
 function nuevoInforme(){
   // Clear all fields
-  const ids=['codigoSitio','fechaEjecucion','fechaTermino','sala','tecnico','numOT',
+  const ids=['codigoSitio','fechaEjecucion','fechaTermino','sala','tecnico','numOT','lpu',
     'ticketInc','ticketTE','ticketTI','ticketRED','resumen','observaciones',
     'eqCircuito','eqNumero','eqTipo','eqMarca','eqModelo',
     'm_cv','m_ca','m_ev','m_ea','m_condv','m_conda','m_tinj','m_tret'];
@@ -1521,7 +1522,7 @@ function buildSummary(){
     ['Técnico',g('tecnico')],
     ['Supervisor',document.getElementById('supervisor').value||supInput.value],
     ['Equipo N°',buildEquipoConCircuito()],['Marca',g('eqMarca')],
-    ['OT',g('numOT')],['Fotos',`${pc} / 12`]
+    ['OT',g('numOT')],['LPU',g('lpu')],['Fotos',`${pc} / 12`]
   ];
   let html=`<div class="cod-badge">📄 ${cod} <span style="font-size:10px;opacity:.7">(+correlativo si duplicado)</span></div>`;
   html+='<table class="summary-table">';
@@ -1552,7 +1553,7 @@ async function generateDocx(){
     codigoSitio:g('codigoSitio'),direccion:g('direccion'),sala:g('sala'),
     tecnico:g('tecnico'),
     supervisor:document.getElementById('supervisor').value||supInput.value,
-    numOT:g('numOT'),
+    numOT:g('numOT'),lpu:g('lpu'),
     ticketInc:g('ticketInc'),ticketTE:g('ticketTE'),ticketTI:g('ticketTI'),ticketRED:g('ticketRED'),
     resumen:g('resumen'),observaciones:g('observaciones'),
     eqSala:g('sala'),eqNumero:buildEquipoConCircuito(),eqTipo:g('eqTipo'),eqMarca:g('eqMarca'),eqModelo:g('eqModelo'),
