@@ -142,6 +142,14 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 .btn-del:hover{background:#fee2e2;}
 .hist-empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.07),0 4px 16px rgba(0,0,0,.05);}
 
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px);}
+.modal-overlay.open{display:flex;}
+.modal-box{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:22px;max-height:80vh;overflow-y:auto;}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;}
+.modal-close{background:#f1f5f9;border:none;font-size:16px;cursor:pointer;color:var(--muted);width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+.modal-info{font-size:12px;color:var(--muted);margin-bottom:14px;padding:9px 13px;background:#f8fafc;border-radius:8px;}
+
 /* ── TOAST ── */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:#1e293b;color:#fff;padding:12px 22px;border-radius:50px;font-size:13px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.25);transition:transform .3s ease;z-index:9999;pointer-events:none;white-space:nowrap;}
 #toast.show{transform:translateX(-50%) translateY(0);}
@@ -410,12 +418,28 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
   <div class="hist-card">
     <div class="hist-header">
       <span class="hist-title">Informes Generados</span>
-      <span class="hist-count" id="hist-count">Cargando...</span>
+      <span style="display:flex;align-items:center;gap:8px;">
+        <span class="hist-count" id="hist-count">Cargando...</span>
+        <button class="btn-dl" onclick="openReporteModal()">📊 Reporte</button>
+      </span>
     </div>
     <div id="hist-body"><div class="hist-empty">Cargando historial...</div></div>
   </div>
   <div class="actions" style="margin-top:12px;">
     <button class="btn btn-secondary" onclick="goTab(0)">← Inicio</button>
+  </div>
+</div>
+
+<!-- REPORTE MODAL -->
+<div class="modal-overlay" id="reporteModal">
+  <div class="modal-box">
+    <div class="modal-title">📊 Generar reporte Excel<button class="modal-close" onclick="closeReporteModal()">✕</button></div>
+    <div class="modal-info">Elige las columnas y los informes a incluir.</div>
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:10px 0 6px">Columnas</div>
+    <div id="reporteColumnas" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;"></div>
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:10px 0 6px">Informes a incluir</div>
+    <div id="reporteInformes" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:14px;"></div>
+    <button class="btn-primary btn" id="btnGenerarReporte" style="width:100%;justify-content:center;" onclick="generarReporte()">📥 Generar Excel</button>
   </div>
 </div>
 
@@ -832,6 +856,50 @@ async function loadHistorial() {
         </div>
       </div>`).join('');
   } catch { body.innerHTML = '<div class="hist-empty">Error al cargar historial.</div>'; }
+}
+
+// ── Reporte Excel ────────────────────────────────────────────────
+const REPORTE_COLUMNAS_WOM=[
+  {key:'fechaInicio',label:'Fecha Inicio'},{key:'ticket',label:'Ticket'},
+  {key:'codInterno',label:'Código Interno'},{key:'instalacion',label:'Instalación'},
+  {key:'tipoActividad',label:'Tipo Actividad'},{key:'tecnicos',label:'Técnicos'},
+  {key:'photoCount',label:'Cant. Fotos'}
+];
+let reporteWomData=[];
+function updateReporteBtnState(){
+  const anyCol=document.querySelector('.reporte-col:checked');
+  const anyInf=document.querySelector('.reporte-inf:checked');
+  document.getElementById('btnGenerarReporte').disabled=!(anyCol&&anyInf);
+}
+async function openReporteModal(){
+  const colsDiv=document.getElementById('reporteColumnas');
+  colsDiv.innerHTML=REPORTE_COLUMNAS_WOM.map(c=>`<label style="display:flex;align-items:center;gap:5px;font-size:12px;"><input type="checkbox" class="reporte-col" value="${c.key}" checked>${c.label}</label>`).join('');
+  const infDiv=document.getElementById('reporteInformes');
+  infDiv.innerHTML='<p style="font-size:12px;color:var(--muted)">Cargando...</p>';
+  document.getElementById('reporteModal').classList.add('open');
+  try{ reporteWomData=await fetch('/registro-wom').then(r=>r.json()); }catch{ reporteWomData=[]; }
+  infDiv.innerHTML=reporteWomData.length?reporteWomData.map(e=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:5px 0;"><input type="checkbox" class="reporte-inf" value="${e.id}" checked>${e.ticket||'—'} · ${e.instalacion||''} · ${e.fechaInicio||''}</label>`).join(''):'<p style="font-size:12px;color:var(--muted)">No hay informes para incluir.</p>';
+  colsDiv.onchange=updateReporteBtnState;
+  infDiv.onchange=updateReporteBtnState;
+  updateReporteBtnState();
+}
+function closeReporteModal(){document.getElementById('reporteModal').classList.remove('open');}
+async function generarReporte(){
+  const columns=[...document.querySelectorAll('.reporte-col:checked')].map(c=>c.value);
+  const ids=[...document.querySelectorAll('.reporte-inf:checked')].map(c=>c.value);
+  if(!columns.length||!ids.length)return;
+  const btn=document.getElementById('btnGenerarReporte');
+  btn.disabled=true;
+  try{
+    const resp=await fetch('/reporte-wom',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({columns,ids})});
+    if(!resp.ok){const e=await resp.json();throw new Error(e.error||'Error del servidor');}
+    const blob=await resp.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=`reporte-wom-${Date.now()}.xlsx`;a.click();URL.revokeObjectURL(url);
+    closeReporteModal();
+    toast('✓ Reporte generado','ok');
+  }catch(err){ toast('Error: '+err.message,'err'); }
+  finally{ btn.disabled=false; }
 }
 
 async function descargar(id) {
