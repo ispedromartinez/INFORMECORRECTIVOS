@@ -13,3 +13,4 @@ server_err.log
 ref*.xml
 ref*.png
 ref*.jpeg
+.superpowers/
