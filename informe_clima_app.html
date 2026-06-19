@@ -300,6 +300,8 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
 .modal-title{font-size:15px;font-weight:700;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;}
 .modal-close{background:#f1f5f9;border:none;font-size:16px;cursor:pointer;color:var(--muted);width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
 .modal-info{font-size:12px;color:var(--muted);margin-bottom:14px;padding:9px 13px;background:#f8fafc;border-radius:8px;}
+.rep-tab{flex:1;text-align:center;padding:7px 4px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;color:var(--muted);}
+.rep-tab.active{background:#fff;color:var(--blue);box-shadow:0 1px 3px rgba(0,0,0,.12);}
 .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px);}
 .app-credit{text-align:center;padding:14px 16px;font-size:11px;color:#B0B3C0;letter-spacing:.3px;pointer-events:none;}
 .confirm-overlay.open{display:flex;}
@@ -650,13 +652,29 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
 
 <!-- REPORTE MODAL -->
 <div class="modal-overlay" id="reporteModal">
-  <div class="modal-box" style="max-width:520px;max-height:80vh;overflow-y:auto;">
+  <div class="modal-box" style="max-width:480px;max-height:85vh;overflow-y:auto;">
     <div class="modal-title">📊 Generar reporte Excel<button class="modal-close" onclick="closeReporteModal()">✕</button></div>
-    <div class="modal-info">Elige las columnas y los informes a incluir.</div>
-    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:10px 0 6px">Columnas</div>
-    <div id="reporteColumnas" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;"></div>
-    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:10px 0 6px">Informes a incluir</div>
-    <div id="reporteInformes" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:14px;"></div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-title">Periodo</div>
+      <div style="display:flex;gap:4px;background:#EDEEF2;border-radius:10px;padding:4px;margin-bottom:10px;">
+        <div class="rep-tab active" data-tipo="todos" onclick="selectPeriodoTipo('todos')">Todos</div>
+        <div class="rep-tab" data-tipo="mes" onclick="selectPeriodoTipo('mes')">Mes</div>
+        <div class="rep-tab" data-tipo="semana" onclick="selectPeriodoTipo('semana')">Semana</div>
+        <div class="rep-tab" data-tipo="fecha" onclick="selectPeriodoTipo('fecha')">Fecha</div>
+      </div>
+      <div id="periodoInputMes" class="field" style="display:none;margin-bottom:0;"><label>Mes</label><input type="month" id="repMes" oninput="updateReporteBtnState()" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 13px;font-size:14px;font-family:inherit;"></div>
+      <div id="periodoInputSemana" class="field" style="display:none;margin-bottom:0;"><label>Cualquier día de la semana</label><input type="date" id="repSemana" oninput="updateReporteBtnState()"></div>
+      <div id="periodoInputFecha" style="display:none;">
+        <div class="row2">
+          <div class="field" style="margin-bottom:0;"><label>Desde</label><input type="date" id="repDesde" oninput="updateReporteBtnState()"></div>
+          <div class="field" style="margin-bottom:0;"><label>Hasta</label><input type="date" id="repHasta" oninput="updateReporteBtnState()"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-title">Columnas</div>
+      <div id="reporteColumnas" style="display:flex;flex-direction:column;gap:9px;"></div>
+    </div>
     <button class="btn-gen" id="btnGenerarReporte" style="font-size:14px;padding:13px" onclick="generarReporte()">📥 Generar Excel</button>
   </div>
 </div>
@@ -1618,37 +1636,56 @@ const REPORTE_COLUMNAS=[
   {key:'tecnico',label:'Técnico'},{key:'supervisor',label:'Supervisor'},
   {key:'numOT',label:'OT'},{key:'photoCount',label:'Cant. Fotos'}
 ];
-function getVisibleHistRecords(){
-  const q=document.getElementById('histSearch')?.value||'';
-  if(!q)return allRecords;
-  const nq=norm(q);
-  return allRecords.filter(r=>norm(r.nombreSitio||'').includes(nq)||norm(r.codInforme||'').includes(nq)||norm(r.tecnico||'').includes(nq)||norm(r.numOT||'').includes(nq));
+let periodoTipoActivo='todos';
+function selectPeriodoTipo(tipo){
+  periodoTipoActivo=tipo;
+  document.querySelectorAll('.rep-tab').forEach(t=>t.classList.toggle('active',t.dataset.tipo===tipo));
+  document.getElementById('periodoInputMes').style.display=tipo==='mes'?'block':'none';
+  document.getElementById('periodoInputSemana').style.display=tipo==='semana'?'block':'none';
+  document.getElementById('periodoInputFecha').style.display=tipo==='fecha'?'block':'none';
+  updateReporteBtnState();
+}
+function buildPeriodoPayload(){
+  if(periodoTipoActivo==='mes')return{tipo:'mes',mes:document.getElementById('repMes').value};
+  if(periodoTipoActivo==='semana')return{tipo:'semana',fecha:document.getElementById('repSemana').value};
+  if(periodoTipoActivo==='fecha')return{tipo:'fecha',desde:document.getElementById('repDesde').value,hasta:document.getElementById('repHasta').value};
+  return{tipo:'todos'};
+}
+function periodoValido(){
+  if(periodoTipoActivo==='mes')return!!document.getElementById('repMes').value;
+  if(periodoTipoActivo==='semana')return!!document.getElementById('repSemana').value;
+  if(periodoTipoActivo==='fecha')return!!document.getElementById('repDesde').value&&!!document.getElementById('repHasta').value;
+  return true;
 }
 function updateReporteBtnState(){
   const anyCol=document.querySelector('.reporte-col:checked');
-  const anyInf=document.querySelector('.reporte-inf:checked');
-  document.getElementById('btnGenerarReporte').disabled=!(anyCol&&anyInf);
+  document.getElementById('btnGenerarReporte').disabled=!(anyCol&&periodoValido());
 }
 function openReporteModal(){
+  periodoTipoActivo='todos';
+  document.querySelectorAll('.rep-tab').forEach(t=>t.classList.toggle('active',t.dataset.tipo==='todos'));
+  document.getElementById('periodoInputMes').style.display='none';
+  document.getElementById('periodoInputSemana').style.display='none';
+  document.getElementById('periodoInputFecha').style.display='none';
+  document.getElementById('repMes').value='';
+  document.getElementById('repSemana').value='';
+  document.getElementById('repDesde').value='';
+  document.getElementById('repHasta').value='';
   const colsDiv=document.getElementById('reporteColumnas');
-  colsDiv.innerHTML=REPORTE_COLUMNAS.map(c=>`<label style="display:flex;align-items:center;gap:5px;font-size:12px;"><input type="checkbox" class="reporte-col" value="${c.key}" checked>${c.label}</label>`).join('');
-  const recs=getVisibleHistRecords();
-  const infDiv=document.getElementById('reporteInformes');
-  infDiv.innerHTML=recs.length?recs.map(r=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:5px 0;"><input type="checkbox" class="reporte-inf" value="${r.id}" checked>${r.nombreSitio||'—'} · ${r.codInforme||''} · ${r.fecha||''}</label>`).join(''):'<p style="font-size:12px;color:var(--muted)">No hay informes para incluir.</p>';
+  colsDiv.innerHTML=REPORTE_COLUMNAS.map(c=>`<label style="display:flex;align-items:center;gap:7px;font-size:13px;"><input type="checkbox" class="reporte-col" value="${c.key}" checked>${c.label}</label>`).join('');
   colsDiv.onchange=updateReporteBtnState;
-  infDiv.onchange=updateReporteBtnState;
   updateReporteBtnState();
   document.getElementById('reporteModal').classList.add('open');
 }
 function closeReporteModal(){document.getElementById('reporteModal').classList.remove('open');}
 async function generarReporte(){
   const columns=[...document.querySelectorAll('.reporte-col:checked')].map(c=>c.value);
-  const ids=[...document.querySelectorAll('.reporte-inf:checked')].map(c=>c.value);
-  if(!columns.length||!ids.length)return;
+  if(!columns.length||!periodoValido())return;
+  const periodo=buildPeriodoPayload();
   const btn=document.getElementById('btnGenerarReporte');
   btn.disabled=true;
   try{
-    const resp=await fetch(SERVER+'/reporte',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({columns,ids})});
+    const resp=await fetch(SERVER+'/reporte',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({columns,periodo})});
     if(!resp.ok){const e=await resp.json();throw new Error(e.error||'Error del servidor');}
     const blob=await resp.blob();
     const url=URL.createObjectURL(blob);
