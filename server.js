@@ -834,6 +834,34 @@ app.delete('/papelera', async (req,res) => {
   res.json({ok:true});
 });
 
+function computeRangoPeriodo(periodo) {
+  if (!periodo || typeof periodo !== 'object') return { error: 'Periodo inválido' };
+  const { tipo } = periodo;
+  if (tipo === 'todos') return { inicio: null, fin: null };
+  if (tipo === 'mes') {
+    if (!periodo.mes || !/^\d{4}-\d{2}$/.test(periodo.mes)) return { error: 'Mes inválido' };
+    const [y, m] = periodo.mes.split('-').map(Number);
+    return { inicio: new Date(y, m - 1, 1, 0, 0, 0, 0), fin: new Date(y, m, 0, 23, 59, 59, 999) };
+  }
+  if (tipo === 'semana') {
+    if (!periodo.fecha) return { error: 'Fecha inválida' };
+    const d = new Date(periodo.fecha + 'T00:00:00');
+    if (isNaN(d)) return { error: 'Fecha inválida' };
+    const dow = (d.getDay() + 6) % 7;
+    const inicio = new Date(d); inicio.setDate(d.getDate() - dow); inicio.setHours(0, 0, 0, 0);
+    const fin = new Date(inicio); fin.setDate(inicio.getDate() + 6); fin.setHours(23, 59, 59, 999);
+    return { inicio, fin };
+  }
+  if (tipo === 'fecha') {
+    if (!periodo.desde || !periodo.hasta) return { error: 'Rango de fecha inválido' };
+    const inicio = new Date(periodo.desde + 'T00:00:00');
+    const fin = new Date(periodo.hasta + 'T23:59:59.999');
+    if (isNaN(inicio) || isNaN(fin)) return { error: 'Rango de fecha inválido' };
+    return { inicio, fin };
+  }
+  return { error: 'Tipo de periodo inválido' };
+}
+
 const REPORTE_COLUMNAS_CLIMA = {
   fecha: 'Fecha', codInforme: 'Código Informe', nombreSitio: 'Sitio',
   codigoSitio: 'Código Sitio', tecnico: 'Técnico', supervisor: 'Supervisor',
@@ -841,14 +869,18 @@ const REPORTE_COLUMNAS_CLIMA = {
 };
 
 app.post('/reporte', async (req, res) => {
-  const { columns, ids } = req.body;
-  if (!Array.isArray(columns) || !columns.length || !Array.isArray(ids) || !ids.length) {
-    return res.status(400).json({ error: 'Selecciona al menos una columna y un informe' });
+  const { columns, periodo } = req.body;
+  if (!Array.isArray(columns) || !columns.length) {
+    return res.status(400).json({ error: 'Selecciona al menos una columna' });
   }
   const validColumns = columns.filter(c => REPORTE_COLUMNAS_CLIMA[c]);
   if (!validColumns.length) return res.status(400).json({ error: 'Columnas inválidas' });
+  const rango = computeRangoPeriodo(periodo);
+  if (rango.error) return res.status(400).json({ error: rango.error });
   const all = await dbClimaList(null);
-  const selected = all.filter(r => ids.includes(r.id));
+  const selected = rango.inicio
+    ? all.filter(r => { const f = new Date(r.fechaCreacion); return f >= rango.inicio && f <= rango.fin; })
+    : all;
   const headerRow = validColumns.map(c => REPORTE_COLUMNAS_CLIMA[c]);
   const dataRows = selected.map(r => validColumns.map(c => r[c] ?? ''));
   const ws = XLSX.utils.aoa_to_sheet([headerRow, ...dataRows]);
@@ -1597,14 +1629,18 @@ const REPORTE_COLUMNAS_WOM = {
 };
 
 app.post('/reporte-wom', async (req, res) => {
-  const { columns, ids } = req.body;
-  if (!Array.isArray(columns) || !columns.length || !Array.isArray(ids) || !ids.length) {
-    return res.status(400).json({ error: 'Selecciona al menos una columna y un informe' });
+  const { columns, periodo } = req.body;
+  if (!Array.isArray(columns) || !columns.length) {
+    return res.status(400).json({ error: 'Selecciona al menos una columna' });
   }
   const validColumns = columns.filter(c => REPORTE_COLUMNAS_WOM[c]);
   if (!validColumns.length) return res.status(400).json({ error: 'Columnas inválidas' });
+  const rango = computeRangoPeriodo(periodo);
+  if (rango.error) return res.status(400).json({ error: rango.error });
   const all = await dbWomList();
-  const selected = all.filter(r => ids.includes(r.id));
+  const selected = rango.inicio
+    ? all.filter(r => { const f = new Date(r.fechaCreacion); return f >= rango.inicio && f <= rango.fin; })
+    : all;
   const headerRow = validColumns.map(c => REPORTE_COLUMNAS_WOM[c]);
   const dataRows = selected.map(r => validColumns.map(c => r[c] ?? ''));
   const ws = XLSX.utils.aoa_to_sheet([headerRow, ...dataRows]);
