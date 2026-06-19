@@ -30,6 +30,7 @@ const PORT_FOR_CORS = process.env.PORT || 3000;
 const allowedOrigins = [
   `http://localhost:${PORT_FOR_CORS}`,
   `http://127.0.0.1:${PORT_FOR_CORS}`,
+  'null', // file:// (HTML abierto directo con doble clic, ver LEEME.txt)
   ...(process.env.ALLOWED_ORIGIN ? [process.env.ALLOWED_ORIGIN] : []),
 ];
 const lanOriginPattern = new RegExp(`^http://192\\.168\\.\\d{1,3}\\.\\d{1,3}:${PORT_FOR_CORS}$`);
