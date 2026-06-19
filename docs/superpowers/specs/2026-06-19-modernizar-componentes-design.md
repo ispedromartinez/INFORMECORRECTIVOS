@@ -32,21 +32,25 @@ estilo pill-track:
 
 ### Botones
 
-Bump de `border-radius` de 8px a 10px en todos los botones de ambos
-archivos (`.btn`, `.btn-primary`, `.btn-secondary`, `.btn-gen`,
-`.btn-refresh`, `.btn-vaciar`, `.btn-add-tec`, `.btn-dl`, `.btn-del`,
-`.act-*`, `.cbtn`, `.rm-btn`/`.rst-btn`/`.rot-btn` si aplica visualmente).
+Bump de `border-radius` de 8px a 10px en los botones rectangulares de
+ambos archivos (`.btn`, `.btn-vaciar`, `.btn-nuevo-start`,
+`.btn-refresh`, `.act-restore`, `.act-perm`, `.act-btn` en Tigo;
+`.btn-add-tec`, `.btn`, `.btn-dl`, `.btn-del` en WOM). Excluidos:
+`.btn-gen` (ya usa `var(--r)`=12px), `.cbtn`/`.modal-close` (viven en
+modales, fuera de alcance), `.rm-btn`/`.rst-btn`/`.rot-btn` (circulos,
+no aplica radio), `.back-btn`/`.btn-icon` (chrome menor, no formulario).
 Sombras (`box-shadow`) existentes se mantienen sin cambio — ya estan en
 linea con el estilo "soft".
 
 ### Inputs
 
-Bump de `border-radius` de 8px a 10px en todos los campos de texto,
-fecha, numero, email, textarea, select y los dropdowns custom de Tigo
-(`.site-in`, `.sup-in`, `.tec-in`, `.sala-in`, `.marca-in`, `.tipo-in` y
-sus `.dd`/`*-dd` desplegables) y de WOM (`.field input/select/textarea`).
-Borde (1.5px) y focus-glow (`box-shadow` con color del accent) se
-mantienen igual.
+Bump de `border-radius` de 8px a 10px en los campos de texto/fecha/
+numero/email/textarea de Tigo (regla generica, `.site-in`, `.sup-in`,
+`.tec-in`, `.sala-in`, `.marca-in`, `.tipo-in`, `.pap-toolbar input`,
+`.hist-search-wrap input`) y en `.field input/select/textarea` de WOM.
+Los menus desplegables (`.dd`, `.sup-dd`, `.tec-dd`, `.sala-dd`,
+`.marca-dd`, `.tipo-dd`) ya estan en 10px, quedan igual. Borde (1.5px) y
+focus-glow (`box-shadow` con color del accent) se mantienen igual.
 
 ## Fuera de alcance
 
