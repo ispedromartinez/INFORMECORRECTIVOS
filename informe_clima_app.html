@@ -577,6 +577,7 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
   <div class="hist-search-wrap">
     <input type="text" id="histSearch" placeholder="🔍 Buscar por sitio, código, técnico, OT..." oninput="filterHist(this.value)">
     <button class="btn-refresh" onclick="loadHist()">↻</button>
+    <button class="btn-refresh" onclick="openReporteModal()">📊 Reporte</button>
   </div>
   <div class="hist-stats" id="histStats">
     <div class="stat-box"><div class="stat-num" id="sTotal">0</div><div class="stat-lbl">Total</div></div>
@@ -644,6 +645,19 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
     </div>
     <button class="btn-gen" style="font-size:14px;padding:13px" onclick="sendEmail()">📤 Enviar</button>
     <div class="status" id="emailStatus"></div>
+  </div>
+</div>
+
+<!-- REPORTE MODAL -->
+<div class="modal-overlay" id="reporteModal">
+  <div class="modal-box" style="max-width:520px;max-height:80vh;overflow-y:auto;">
+    <div class="modal-title">📊 Generar reporte Excel<button class="modal-close" onclick="closeReporteModal()">✕</button></div>
+    <div class="modal-info">Elige las columnas y los informes a incluir.</div>
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:10px 0 6px">Columnas</div>
+    <div id="reporteColumnas" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;"></div>
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:10px 0 6px">Informes a incluir</div>
+    <div id="reporteInformes" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:14px;"></div>
+    <button class="btn-gen" id="btnGenerarReporte" style="font-size:14px;padding:13px" onclick="generarReporte()">📥 Generar Excel</button>
   </div>
 </div>
 
@@ -1595,6 +1609,53 @@ function filterHist(q){
   if(!q){renderHist(allRecords);return;}
   const nq=norm(q);
   renderHist(allRecords.filter(r=>norm(r.nombreSitio||'').includes(nq)||norm(r.codInforme||'').includes(nq)||norm(r.tecnico||'').includes(nq)||norm(r.numOT||'').includes(nq)));
+}
+
+// ══ REPORTE EXCEL ══
+const REPORTE_COLUMNAS=[
+  {key:'fecha',label:'Fecha'},{key:'codInforme',label:'Código Informe'},
+  {key:'nombreSitio',label:'Sitio'},{key:'codigoSitio',label:'Código Sitio'},
+  {key:'tecnico',label:'Técnico'},{key:'supervisor',label:'Supervisor'},
+  {key:'numOT',label:'OT'},{key:'photoCount',label:'Cant. Fotos'}
+];
+function getVisibleHistRecords(){
+  const q=document.getElementById('histSearch')?.value||'';
+  if(!q)return allRecords;
+  const nq=norm(q);
+  return allRecords.filter(r=>norm(r.nombreSitio||'').includes(nq)||norm(r.codInforme||'').includes(nq)||norm(r.tecnico||'').includes(nq)||norm(r.numOT||'').includes(nq));
+}
+function updateReporteBtnState(){
+  const anyCol=document.querySelector('.reporte-col:checked');
+  const anyInf=document.querySelector('.reporte-inf:checked');
+  document.getElementById('btnGenerarReporte').disabled=!(anyCol&&anyInf);
+}
+function openReporteModal(){
+  const colsDiv=document.getElementById('reporteColumnas');
+  colsDiv.innerHTML=REPORTE_COLUMNAS.map(c=>`<label style="display:flex;align-items:center;gap:5px;font-size:12px;"><input type="checkbox" class="reporte-col" value="${c.key}" checked>${c.label}</label>`).join('');
+  const recs=getVisibleHistRecords();
+  const infDiv=document.getElementById('reporteInformes');
+  infDiv.innerHTML=recs.length?recs.map(r=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:5px 0;"><input type="checkbox" class="reporte-inf" value="${r.id}" checked>${r.nombreSitio||'—'} · ${r.codInforme||''} · ${r.fecha||''}</label>`).join(''):'<p style="font-size:12px;color:var(--muted)">No hay informes para incluir.</p>';
+  colsDiv.onchange=updateReporteBtnState;
+  infDiv.onchange=updateReporteBtnState;
+  updateReporteBtnState();
+  document.getElementById('reporteModal').classList.add('open');
+}
+function closeReporteModal(){document.getElementById('reporteModal').classList.remove('open');}
+async function generarReporte(){
+  const columns=[...document.querySelectorAll('.reporte-col:checked')].map(c=>c.value);
+  const ids=[...document.querySelectorAll('.reporte-inf:checked')].map(c=>c.value);
+  if(!columns.length||!ids.length)return;
+  const btn=document.getElementById('btnGenerarReporte');
+  btn.disabled=true;
+  try{
+    const resp=await fetch(SERVER+'/reporte',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({columns,ids})});
+    if(!resp.ok){const e=await resp.json();throw new Error(e.error||'Error del servidor');}
+    const blob=await resp.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=`reporte-tigo-${Date.now()}.xlsx`;a.click();URL.revokeObjectURL(url);
+    closeReporteModal();
+  }catch(err){alert('Error: '+err.message);}
+  finally{btn.disabled=false;}
 }
 function renderHist(records){
   const now=new Date();
