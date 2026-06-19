@@ -1,4 +1,6 @@
 const express = require('express');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
@@ -24,7 +26,41 @@ if (supabase) {
 }
 
 const app = express();
-app.use(cors());
+app.use(helmet({ contentSecurityPolicy: false })); // CSP off: HTML usa scripts inline
+
+const PORT_FOR_CORS = process.env.PORT || 3000;
+const allowedOrigins = [
+  `http://localhost:${PORT_FOR_CORS}`,
+  `http://127.0.0.1:${PORT_FOR_CORS}`,
+  'null', // file:// (HTML abierto directo con doble clic, ver LEEME.txt)
+  ...(process.env.ALLOWED_ORIGIN ? [process.env.ALLOWED_ORIGIN] : []),
+];
+const lanOriginPattern = new RegExp(`^http://192\\.168\\.\\d{1,3}\\.\\d{1,3}:${PORT_FOR_CORS}$`);
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin) || lanOriginPattern.test(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error('Origen no permitido por CORS: ' + origin));
+  },
+}));
+const generalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas peticiones, intenta de nuevo en un momento.' },
+});
+const heavyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas peticiones a este endpoint, intenta de nuevo en un momento.' },
+});
+
+app.use(generalLimiter);
 app.use(express.json({ limit: '80mb' }));
 app.use(express.static(__dirname));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'selector.html')));
@@ -664,7 +700,7 @@ app.get('/version', (req,res) => {
   } catch { res.json({ v: 0 }); }
 });
 
-app.post('/generar', async (req,res) => {
+app.post('/generar', heavyLimiter, async (req,res) => {
   try {
     const d = req.body;
     const buffer = await buildDocx(d);
@@ -711,7 +747,7 @@ app.get('/descargar/:id', async (req,res) => {
   res.send(buffer);
 });
 
-app.post('/enviar/:id', async (req,res) => {
+app.post('/enviar/:id', heavyLimiter, async (req,res) => {
   const entry = await dbClimaFind(req.params.id);
   if (!entry) return res.status(404).json({error:'No encontrado'});
   let buffer = await storageDownload(`clima/${entry.filename}`);
@@ -1424,7 +1460,7 @@ async function buildDocxWom_UNUSED(d) {
 app.get('/sitios-rso', (_req, res) => res.json(RSO_SITES));
 app.get('/actividades-wom', (_req, res) => res.json(ACTIVIDADES_WOM));
 
-app.post('/generar-wom', async (req, res) => {
+app.post('/generar-wom', heavyLimiter, async (req, res) => {
   try {
     const d = req.body;
     const buffer = await buildDocxWom(d);
