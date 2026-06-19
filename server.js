@@ -151,10 +151,10 @@ async function dbClimaList(q) {
 async function dbClimaInsert(entry) {
   if (supabase) {
     const { error } = await supabase.from('informes_clima').insert(toClima(entry));
-    if (error) console.error('dbClimaInsert:', error.message);
-  } else {
-    const db = loadDBLocal(); db.unshift(entry); saveDBLocal(db);
+    if (!error) return;
+    console.error('dbClimaInsert:', error.message);
   }
+  const db = loadDBLocal(); db.unshift(entry); saveDBLocal(db);
 }
 
 async function dbClimaFind(id) {
@@ -500,6 +500,11 @@ async function buildDocx(d) {
     VC(v(d.numOT), w_tk_otv, 2)
   ]});
 
+  const row_lpu = new TableRow({ height:{value:280}, children:[
+    LC('LPU', w_tk_label, 2),
+    VC(v(d.lpu), TW-w_tk_label, 12)
+  ]});
+
   const row_sala = new TableRow({ height:{value:280}, children:[
     LC('Sala', w_tk_label, 2),
     VC(v(d.sala), w_tk_inc+w_tk_te+w_tk_ti+w_tk_red, 8),
@@ -627,7 +632,7 @@ async function buildDocx(d) {
     width: { size: TW, type: WidthType.DXA },
     columnWidths: scaled,
     rows: [
-      row_ig, row_sitio, row_dir, row_tk, row_tk2, row_sala, row_tec,
+      row_ig, row_sitio, row_dir, row_tk, row_tk2, row_lpu, row_sala, row_tec,
       row_rs, row_rs2,
       row_eq, row_eq_h, row_eq_d,
       row_med, row_med_h1, row_med_h2, row_med_d,
@@ -889,10 +894,10 @@ async function dbWomList() {
 async function dbWomInsert(entry) {
   if (supabase) {
     const { error } = await supabase.from('informes_wom').insert(toWom(entry));
-    if (error) console.error('dbWomInsert:', error.message);
-  } else {
-    const db = loadDBWomLocal(); db.unshift(entry); saveDBWomLocal(db);
+    if (!error) return;
+    console.error('dbWomInsert:', error.message);
   }
+  const db = loadDBWomLocal(); db.unshift(entry); saveDBWomLocal(db);
 }
 
 async function dbWomFind(id) {

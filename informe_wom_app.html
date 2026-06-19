@@ -448,6 +448,7 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 <div id="toast"></div>
 
 <script>
+const SERVER=location.protocol==='file:'?'http://localhost:3000':window.location.origin;
 // ── RSO sites map ────────────────────────────────────────────
 const RSO = {
   'RSO CONCEPCION':   'ANIBAL PINTO 105, CONCEPCION',
@@ -572,7 +573,7 @@ function updateBadge() { /* dot reflects server, not ticket */ }
 async function checkServer() {
   const dot = g('badge-estado');
   try {
-    const r = await fetch('/ping', { signal: AbortSignal.timeout(2000) });
+    const r = await fetch(`${SERVER}/ping`, { signal: AbortSignal.timeout(2000) });
     if (r.ok) { dot.className = 'srv-dot on'; dot.title = 'Servidor activo'; }
     else throw new Error();
   } catch(e) {
@@ -802,7 +803,7 @@ async function generarInforme() {
   };
 
   try {
-    const resp = await fetch('/generar-wom', {
+    const resp = await fetch(`${SERVER}/generar-wom`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -833,7 +834,7 @@ async function loadHistorial() {
   if (!body) return;
   body.innerHTML = '<div class="hist-empty">Cargando...</div>';
   try {
-    const data = await fetch('/registro-wom').then(r=>r.json());
+    const data = await fetch(`${SERVER}/registro-wom`).then(r=>r.json());
     g('hist-count').textContent = `${data.length} informe(s)`;
     if (!data.length) { body.innerHTML = '<div class="hist-empty">No hay informes generados aún.</div>'; return; }
     body.innerHTML = data.map(e => `
@@ -855,14 +856,14 @@ async function loadHistorial() {
 }
 
 async function descargar(id) {
-  window.location.href = `/descargar-wom/${id}`;
+  window.location.href = `${SERVER}/descargar-wom/${id}`;
 }
 
 async function eliminar(id, btn) {
   if (!confirm('¿Mover este informe a la papelera?')) return;
   btn.disabled = true;
   try {
-    await fetch(`/registro-wom/${id}`, { method:'DELETE' });
+    await fetch(`${SERVER}/registro-wom/${id}`, { method:'DELETE' });
     toast('Informe movido a papelera');
     loadHistorial();
   } catch { toast('Error al eliminar','err'); btn.disabled = false; }
