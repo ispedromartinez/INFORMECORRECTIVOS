@@ -1967,8 +1967,9 @@ async function confirmDelete(){
   try{
     const resp=await fetch(`${SERVER}/registro/${id}`,{method:'DELETE'});
     if(!resp.ok){
-      const err=await resp.json().catch(()=>({}));
-      alert('No se pudo borrar el informe:\n'+(err.error||('Error '+resp.status)));
+      let msg='Error '+resp.status;
+      try{const t=await resp.text();try{const j=JSON.parse(t);if(j&&j.error)msg=j.error;}catch{if(t)msg=t.slice(0,300);}}catch{}
+      alert('No se pudo borrar el informe:\n'+msg);
     }
     await loadHist(true);
     await loadPapelera(true);

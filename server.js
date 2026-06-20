@@ -165,9 +165,11 @@ function makeRepo({ table, papelera, dbFile, papeleraFile, from, to,
     },
     async remove(id) {
       if (supabase) {
-        const { data, error } = await supabase.from(table).delete().eq('id', id).select();
-        if (error) { console.error(`${table} delete:`, error.message); return { error: error.message }; }
-        if (!data || !data.length) return { error: `No se pudo eliminar de ${table}: Supabase no borró filas (revisa políticas RLS DELETE o usa la service_role key).` };
+        try {
+          const { data, error } = await supabase.from(table).delete().eq('id', id).select();
+          if (error) { console.error(`${table} delete:`, error); return { error: `${table}: ${error.message}${error.hint ? ' ('+error.hint+')' : ''}` }; }
+          if (!data || !data.length) return { error: `No se borró ninguna fila en ${table} (id=${id}); el id no coincide con la columna.` };
+        } catch (e) { console.error(`${table} delete (excepción):`, e); return { error: `${table}: ${e.message || e}` }; }
       } else { saveDB(loadDB().filter(r => r.id !== id)); }
       return { ok: true };
     },
@@ -194,9 +196,11 @@ function makeRepo({ table, papelera, dbFile, papeleraFile, from, to,
     },
     async papDelete(id) {
       if (supabase) {
-        const { data, error } = await supabase.from(papelera).delete().eq('id', id).select();
-        if (error) { console.error(`${papelera} delete:`, error.message); return { error: error.message }; }
-        if (!data || !data.length) return { error: `No se pudo eliminar de ${papelera}: Supabase no borró filas (revisa políticas RLS DELETE o usa la service_role key).` };
+        try {
+          const { data, error } = await supabase.from(papelera).delete().eq('id', id).select();
+          if (error) { console.error(`${papelera} delete:`, error); return { error: `${papelera}: ${error.message}${error.hint ? ' ('+error.hint+')' : ''}` }; }
+          if (!data || !data.length) return { error: `No se borró ninguna fila en ${papelera} (id=${id}); el id no coincide con la columna.` };
+        } catch (e) { console.error(`${papelera} delete (excepción):`, e); return { error: `${papelera}: ${e.message || e}` }; }
       } else { savePap(loadPap().filter(r => r.id !== id)); }
       return { ok: true };
     },
