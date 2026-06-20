@@ -166,9 +166,8 @@ function makeRepo({ table, papelera, dbFile, papeleraFile, from, to,
     async remove(id) {
       if (supabase) {
         try {
-          const { data, error } = await supabase.from(table).delete().eq('id', id).select();
+          const { error } = await supabase.from(table).delete().eq('id', id);
           if (error) { console.error(`${table} delete:`, error); return { error: `${table}: ${error.message}${error.hint ? ' ('+error.hint+')' : ''}` }; }
-          if (!data || !data.length) return { error: `No se borró ninguna fila en ${table} (id=${id}); el id no coincide con la columna.` };
         } catch (e) { console.error(`${table} delete (excepción):`, e); return { error: `${table}: ${e.message || e}` }; }
       } else { saveDB(loadDB().filter(r => r.id !== id)); }
       return { ok: true };
@@ -183,9 +182,12 @@ function makeRepo({ table, papelera, dbFile, papeleraFile, from, to,
     },
     async papInsert(entry) {
       if (supabase) {
-        const { error } = await supabase.from(papelera).insert({ ...to(entry), [delCol]: entry[delKey] });
-        if (error) console.error(`${papelera} insert:`, error.message);
+        try {
+          const { error } = await supabase.from(papelera).insert({ ...to(entry), [delCol]: entry[delKey] });
+          if (error) { console.error(`${papelera} insert:`, error); return { error: `${papelera}: ${error.message}${error.hint ? ' ('+error.hint+')' : ''}` }; }
+        } catch (e) { console.error(`${papelera} insert (excepción):`, e); return { error: `${papelera}: ${e.message || e}` }; }
       } else { const p = loadPap(); p.unshift(entry); savePap(p); }
+      return { ok: true };
     },
     async papFind(id) {
       if (supabase) {
@@ -197,9 +199,8 @@ function makeRepo({ table, papelera, dbFile, papeleraFile, from, to,
     async papDelete(id) {
       if (supabase) {
         try {
-          const { data, error } = await supabase.from(papelera).delete().eq('id', id).select();
+          const { error } = await supabase.from(papelera).delete().eq('id', id);
           if (error) { console.error(`${papelera} delete:`, error); return { error: `${papelera}: ${error.message}${error.hint ? ' ('+error.hint+')' : ''}` }; }
-          if (!data || !data.length) return { error: `No se borró ninguna fila en ${papelera} (id=${id}); el id no coincide con la columna.` };
         } catch (e) { console.error(`${papelera} delete (excepción):`, e); return { error: `${papelera}: ${e.message || e}` }; }
       } else { savePap(loadPap().filter(r => r.id !== id)); }
       return { ok: true };
@@ -814,17 +815,23 @@ app.post('/enviar/:id', heavyLimiter, async (req,res) => {
 
 // Mover a papelera (soft delete)
 app.delete('/registro/:id', async (req,res) => {
+ try {
   const entry = await dbClimaFind(req.params.id);
   if (!entry) return res.status(404).json({error:'No encontrado'});
+  // 1) Guardar en la papelera PRIMERO (si falla, no se pierde el informe)
+  const ins = await dbPapeleraInsert({ ...entry, fechaEliminado: new Date().toISOString() });
+  if (ins && ins.error) return res.status(500).json({ error: 'No se pudo mover a la papelera: ' + ins.error });
+  // 2) Borrar del registro principal (si falla, deshacer el paso 1)
   const del = await dbClimaDelete(entry.id);
-  if (del && del.error) return res.status(500).json({ error: del.error });
-  await storageMove(`clima/${entry.filename}`, `clima/papelera/${entry.filename}`);
+  if (del && del.error) { await dbPapeleraDelete(entry.id); return res.status(500).json({ error: del.error }); }
+  // 3) Mover el archivo (best-effort; no debe romper el borrado)
   try {
+    await storageMove(`clima/${entry.filename}`, `clima/papelera/${entry.filename}`);
     const srcPath = path.join(DOCS_DIR, entry.filename);
     if (fs.existsSync(srcPath)) fs.renameSync(srcPath, path.join(PAPELERA_DIR, entry.filename));
-  } catch(e) {}
-  await dbPapeleraInsert({ ...entry, fechaEliminado: new Date().toISOString() });
+  } catch(e) { console.error('mover archivo a papelera:', e.message); }
   res.json({ok:true});
+ } catch(e) { console.error('DELETE /registro:', e); res.status(500).json({ error: 'No se pudo borrar: '+(e.message||e) }); }
 });
 
 // List papelera
@@ -1408,17 +1415,23 @@ app.get('/descargar-wom/:id', async (req, res) => {
 });
 
 app.delete('/registro-wom/:id', async (req, res) => {
+ try {
   const entry = await dbWomFind(req.params.id);
   if (!entry) return res.status(404).json({error:'No encontrado'});
+  // 1) Guardar en la papelera PRIMERO (si falla, no se pierde el informe)
+  const ins = await dbPapeleraWomInsert({ ...entry, deletedAt: new Date().toISOString() });
+  if (ins && ins.error) return res.status(500).json({ error: 'No se pudo mover a la papelera: ' + ins.error });
+  // 2) Borrar del registro principal (si falla, deshacer el paso 1)
   const del = await dbWomDelete(entry.id);
-  if (del && del.error) return res.status(500).json({ error: del.error });
-  await storageMove(`wom/${entry.filename}`, `wom/papelera/${entry.filename}`);
+  if (del && del.error) { await dbPapeleraWomDelete(entry.id); return res.status(500).json({ error: del.error }); }
+  // 3) Mover el archivo (best-effort)
   try {
+    await storageMove(`wom/${entry.filename}`, `wom/papelera/${entry.filename}`);
     const fp = path.join(DOCS_DIR_WOM, entry.filename);
     if (fs.existsSync(fp)) fs.renameSync(fp, path.join(PAPELERA_DIR_WOM, entry.filename));
-  } catch(e) {}
-  await dbPapeleraWomInsert({ ...entry, deletedAt: new Date().toISOString() });
+  } catch(e) { console.error('mover archivo a papelera (wom):', e.message); }
   res.json({ok:true});
+ } catch(e) { console.error('DELETE /registro-wom:', e); res.status(500).json({ error: 'No se pudo borrar: '+(e.message||e) }); }
 });
 
 app.get('/papelera-wom', async (_req, res) => res.json(await dbPapeleraWomList()));
@@ -1471,6 +1484,30 @@ const REPORTE_COLUMNAS_WOM = {
 
 app.post('/reporte-wom', reporteHandler(REPORTE_COLUMNAS_WOM, () => dbWomList(), 'reporte-wom.xlsx'));
 
+// ── Auto-purga de papelera: borra definitivamente lo que lleve +30 días ──
+const RETENCION_DIAS = Number(process.env.RETENCION_DIAS) || 30;
+async function purgarPapelera(nombre, { papList, papDelete, prefix, dir, delKey }) {
+  try {
+    const items = await papList(null);
+    const limite = Date.now() - RETENCION_DIAS * 24 * 60 * 60 * 1000;
+    let n = 0;
+    for (const e of items) {
+      const t = new Date(e[delKey]).getTime();
+      if (isNaN(t) || t >= limite) continue;            // sin fecha válida o aún reciente → conservar
+      const del = await papDelete(e.id);
+      if (del && del.error) { console.error(`purga ${nombre} (${e.filename}):`, del.error); continue; }
+      await storageRemove([`${prefix}/papelera/${e.filename}`]);
+      try { const fp = path.join(dir, e.filename); if (fs.existsSync(fp)) fs.unlinkSync(fp); } catch {}
+      n++;
+    }
+    if (n) console.log(`🗑️  Papelera ${nombre}: ${n} informe(s) borrados definitivamente (>${RETENCION_DIAS} días).`);
+  } catch (e) { console.error(`purgarPapelera ${nombre}:`, e.message || e); }
+}
+async function purgarTodasLasPapeleras() {
+  await purgarPapelera('clima', { papList: dbPapeleraList,    papDelete: dbPapeleraDelete,    prefix: 'clima', dir: PAPELERA_DIR,     delKey: 'fechaEliminado' });
+  await purgarPapelera('wom',   { papList: dbPapeleraWomList, papDelete: dbPapeleraWomDelete, prefix: 'wom',   dir: PAPELERA_DIR_WOM, delKey: 'deletedAt' });
+}
+
 const PORT = process.env.PORT || 3000;
 const os = require('os');
 function getLocalIP() {
@@ -1487,4 +1524,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`   PC:     http://localhost:${PORT}`);
   console.log(`   Celular (misma red WiFi): http://${ip}:${PORT}`);
   console.log(`   Informes guardados en: ./informes/`);
+  // Purga de papelera al arrancar y luego cada 24 h
+  purgarTodasLasPapeleras();
+  setInterval(purgarTodasLasPapeleras, 24 * 60 * 60 * 1000);
 });
