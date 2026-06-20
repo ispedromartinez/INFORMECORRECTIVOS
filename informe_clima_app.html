@@ -229,6 +229,9 @@ input.has-error,textarea.has-error{border-color:#ef4444!important;background:#ff
 .hist-search-wrap input:focus{outline:none;border-color:var(--bm);}
 .btn-refresh{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:.15s;}
 .btn-refresh:hover{background:var(--bm);}
+.btn-refresh:active{transform:scale(.95);}
+#btnRefreshHist.spinning{animation:spinRefresh .6s linear infinite;}
+@keyframes spinRefresh{to{transform:rotate(360deg);}}
 .hist-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
 .stat-box{background:var(--white);border-radius:10px;box-shadow:var(--sh);padding:16px 12px;text-align:center;border:1px solid var(--border);}
 .stat-num{font-size:26px;font-weight:800;color:var(--blue);}
@@ -632,7 +635,7 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
 <div class="section" id="tab7">
   <div class="hist-search-wrap">
     <input type="text" id="histSearch" placeholder="🔍 Buscar por sitio, código, técnico, OT..." oninput="filterHist(this.value)">
-    <button class="btn-refresh" onclick="loadHist()">↻</button>
+    <button id="btnRefreshHist" class="btn-refresh" onclick="refreshHist()">↻</button>
     <button class="btn-refresh" onclick="openReporteModal()">📊 Reporte</button>
   </div>
   <div class="hist-stats" id="histStats">
@@ -1681,12 +1684,19 @@ async function generateDocx(){
 }
 
 // ══ HISTORIAL ══
+async function refreshHist(){
+  const b=document.getElementById('btnRefreshHist');
+  if(b)b.classList.add('spinning');
+  serverOnline=false;            // fuerza re-chequeo del servidor
+  try{ await loadHist(); }
+  finally{ if(b)setTimeout(()=>b.classList.remove('spinning'),400); }
+}
 async function loadHist(silent=false){
   if(!serverOnline)await checkServer();
   try{
     const q=document.getElementById('histSearch')?.value||'';
     const url=q?`${SERVER}/registro?q=${encodeURIComponent(q)}`:SERVER+'/registro';
-    const r=await fetch(url);allRecords=await r.json();renderHist(allRecords);
+    const r=await fetch(url,{cache:'no-store'});allRecords=await r.json();renderHist(allRecords);
   }catch{
     if(!silent)document.getElementById('histList').innerHTML='<div class="hist-empty"><div class="ei">⚠️</div><p>No se pudo conectar al servidor.<br><strong>Ejecuta: node server.js</strong></p></div>';
   }
@@ -1853,7 +1863,7 @@ async function loadPapelera(silent=false) {
   try {
     const q = document.getElementById('papSearch')?.value||'';
     const url = q ? `${SERVER}/papelera?q=${encodeURIComponent(q)}` : SERVER+'/papelera';
-    const r = await fetch(url);
+    const r = await fetch(url,{cache:'no-store'});
     allPapelera = await r.json();
     renderPapelera(allPapelera);
   } catch {
@@ -1955,7 +1965,11 @@ async function confirmDelete(){
   allRecords=allRecords.filter(r=>r.id!==id);
   document.getElementById('histTabNum').textContent=allRecords.length||'0';
   try{
-    await fetch(`${SERVER}/registro/${id}`,{method:'DELETE'});
+    const resp=await fetch(`${SERVER}/registro/${id}`,{method:'DELETE'});
+    if(!resp.ok){
+      const err=await resp.json().catch(()=>({}));
+      alert('No se pudo borrar el informe:\n'+(err.error||('Error '+resp.status)));
+    }
     await loadHist(true);
     await loadPapelera(true);
   }catch(e){alert('Error al mover a papelera: '+e.message);}
