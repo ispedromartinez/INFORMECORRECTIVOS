@@ -14,3 +14,6 @@ ref*.xml
 ref*.png
 ref*.jpeg
 .superpowers/
+.agents/
+skills-lock.json
+_test_*.xlsx

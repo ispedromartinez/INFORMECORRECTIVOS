@@ -4,7 +4,7 @@ const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-const XLSX = require('xlsx');
+const XLSXStyle = require('xlsx-js-style');
 const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
@@ -78,18 +78,14 @@ if (!fs.existsSync(PAPELERA_DIR)) fs.mkdirSync(PAPELERA_DIR);
 if (!fs.existsSync(DB_FILE))      fs.writeFileSync(DB_FILE, '[]');
 if (!fs.existsSync(PAPELERA_FILE))fs.writeFileSync(PAPELERA_FILE, '[]');
 
-// ── Local fallback helpers ─────────────────────────────────────
-function loadDBLocal()       { try { return JSON.parse(fs.readFileSync(DB_FILE,'utf8')); }       catch { return []; } }
-function saveDBLocal(d)      { fs.writeFileSync(DB_FILE, JSON.stringify(d, null, 2)); }
-function loadPapeleraLocal() { try { return JSON.parse(fs.readFileSync(PAPELERA_FILE,'utf8')); } catch { return []; } }
-function savePapeleraLocal(d){ fs.writeFileSync(PAPELERA_FILE, JSON.stringify(d, null, 2)); }
-
 // ── Row mappers – Clima ────────────────────────────────────────
 const fromClima = r => ({
   id: r.id, fecha: r.fecha, fechaCreacion: r.fecha_creacion,
   codInforme: r.cod_informe, nombreSitio: r.nombre_sitio,
   codigoSitio: r.codigo_sitio, tecnico: r.tecnico,
   supervisor: r.supervisor, numOT: r.num_ot,
+  lpu: r.lpu, inc: r.inc, equipo: r.equipo, circuito: r.circuito,
+  tipoEquipo: r.tipo_equipo, marca: r.marca,
   photoCount: r.photo_count, filename: r.filename
 });
 const toClima = e => ({
@@ -97,6 +93,8 @@ const toClima = e => ({
   cod_informe: e.codInforme, nombre_sitio: e.nombreSitio,
   codigo_sitio: e.codigoSitio, tecnico: e.tecnico,
   supervisor: e.supervisor, num_ot: e.numOT,
+  lpu: e.lpu, inc: e.inc, equipo: e.equipo, circuito: e.circuito,
+  tipo_equipo: e.tipoEquipo, marca: e.marca,
   photo_count: e.photoCount, filename: e.filename
 });
 
@@ -130,111 +128,94 @@ async function storageRemove(paths) {
   if (error) console.error('storageRemove error:', error.message);
 }
 
-// ── Async DB – Informes Clima ──────────────────────────────────
-async function dbClimaList(q) {
-  if (supabase) {
-    const { data, error } = await supabase.from('informes_clima')
-      .select('*').order('fecha_creacion', { ascending: false });
-    if (!error) {
-      const rows = (data||[]).map(fromClima);
-      if (!q) return rows;
-      const ql = q.toLowerCase();
-      return rows.filter(r => ['nombreSitio','codInforme','tecnico','numOT']
-        .some(k => (r[k]||'').toLowerCase().includes(ql)));
+// ── Repositorio genérico (Supabase + fallback local JSON) ──────
+// Genera toda la capa de acceso a datos de un módulo a partir de su config.
+function makeRepo({ table, papelera, dbFile, papeleraFile, from, to,
+                    searchFields = [], papSearchFields = [], delCol, delKey }) {
+  const loadDB  = () => { try { return JSON.parse(fs.readFileSync(dbFile, 'utf8')); }       catch { return []; } };
+  const saveDB  = d  => fs.writeFileSync(dbFile, JSON.stringify(d, null, 2));
+  const loadPap = () => { try { return JSON.parse(fs.readFileSync(papeleraFile, 'utf8')); } catch { return []; } };
+  const savePap = d  => fs.writeFileSync(papeleraFile, JSON.stringify(d, null, 2));
+  const filt = (rows, q, fields) => {
+    if (!q) return rows;
+    const ql = q.toLowerCase();
+    return rows.filter(r => fields.some(k => (r[k] || '').toLowerCase().includes(ql)));
+  };
+  return {
+    async list(q) {
+      if (supabase) {
+        const { data, error } = await supabase.from(table).select('*').order('fecha_creacion', { ascending: false });
+        if (!error) return filt((data || []).map(from), q, searchFields);
+        console.error(`${table} list:`, error.message);
+      }
+      return filt(loadDB(), q, searchFields);
+    },
+    async insert(entry) {
+      if (supabase) {
+        const { error } = await supabase.from(table).insert(to(entry));
+        if (error) console.error(`${table} insert:`, error.message);
+      } else { const db = loadDB(); db.unshift(entry); saveDB(db); }
+    },
+    async find(id) {
+      if (supabase) {
+        const { data, error } = await supabase.from(table).select('*').eq('id', id).single();
+        if (!error && data) return from(data);
+      }
+      return loadDB().find(r => r.id === id) || null;
+    },
+    async remove(id) {
+      if (supabase) {
+        const { error } = await supabase.from(table).delete().eq('id', id);
+        if (error) console.error(`${table} delete:`, error.message);
+      } else { saveDB(loadDB().filter(r => r.id !== id)); }
+    },
+    async papList(q) {
+      if (supabase) {
+        const { data, error } = await supabase.from(papelera).select('*').order(delCol, { ascending: false });
+        if (!error) return filt((data || []).map(r => ({ ...from(r), [delKey]: r[delCol] })), q, papSearchFields);
+        console.error(`${papelera} list:`, error.message);
+      }
+      return filt(loadPap(), q, papSearchFields);
+    },
+    async papInsert(entry) {
+      if (supabase) {
+        const { error } = await supabase.from(papelera).insert({ ...to(entry), [delCol]: entry[delKey] });
+        if (error) console.error(`${papelera} insert:`, error.message);
+      } else { const p = loadPap(); p.unshift(entry); savePap(p); }
+    },
+    async papFind(id) {
+      if (supabase) {
+        const { data, error } = await supabase.from(papelera).select('*').eq('id', id).single();
+        if (!error && data) return { ...from(data), [delKey]: data[delCol] };
+      }
+      return loadPap().find(r => r.id === id) || null;
+    },
+    async papDelete(id) {
+      if (supabase) {
+        const { error } = await supabase.from(papelera).delete().eq('id', id);
+        if (error) console.error(`${papelera} delete:`, error.message);
+      } else { savePap(loadPap().filter(r => r.id !== id)); }
+    },
+    async papClear() {
+      if (supabase) {
+        const { error } = await supabase.from(papelera).delete().neq('id', '');
+        if (error) console.error(`${papelera} clear:`, error.message);
+      } else { savePap([]); }
     }
-    console.error('dbClimaList:', error.message);
-  }
-  const db = loadDBLocal();
-  if (!q) return db;
-  const ql = q.toLowerCase();
-  return db.filter(r => ['nombreSitio','codInforme','tecnico','numOT']
-    .some(k => (r[k]||'').toLowerCase().includes(ql)));
+  };
 }
 
-async function dbClimaInsert(entry) {
-  if (supabase) {
-    const { error } = await supabase.from('informes_clima').insert(toClima(entry));
-    if (error) console.error('dbClimaInsert:', error.message);
-  } else {
-    const db = loadDBLocal(); db.unshift(entry); saveDBLocal(db);
-  }
-}
-
-async function dbClimaFind(id) {
-  if (supabase) {
-    const { data, error } = await supabase.from('informes_clima')
-      .select('*').eq('id', id).single();
-    if (!error && data) return fromClima(data);
-  }
-  return loadDBLocal().find(r => r.id === id) || null;
-}
-
-async function dbClimaDelete(id) {
-  if (supabase) {
-    const { error } = await supabase.from('informes_clima').delete().eq('id', id);
-    if (error) console.error('dbClimaDelete:', error.message);
-  } else {
-    saveDBLocal(loadDBLocal().filter(r => r.id !== id));
-  }
-}
-
-// ── Async DB – Papelera Clima ──────────────────────────────────
-async function dbPapeleraList(q) {
-  if (supabase) {
-    const { data, error } = await supabase.from('papelera_clima')
-      .select('*').order('fecha_eliminado', { ascending: false });
-    if (!error) {
-      const rows = (data||[]).map(r => ({ ...fromClima(r), fechaEliminado: r.fecha_eliminado }));
-      if (!q) return rows;
-      const ql = q.toLowerCase();
-      return rows.filter(r => ['nombreSitio','codInforme','tecnico']
-        .some(k => (r[k]||'').toLowerCase().includes(ql)));
-    }
-    console.error('dbPapeleraList:', error.message);
-  }
-  const p = loadPapeleraLocal();
-  if (!q) return p;
-  const ql = q.toLowerCase();
-  return p.filter(r => ['nombreSitio','codInforme','tecnico']
-    .some(k => (r[k]||'').toLowerCase().includes(ql)));
-}
-
-async function dbPapeleraInsert(entry) {
-  if (supabase) {
-    const row = { ...toClima(entry), fecha_eliminado: entry.fechaEliminado };
-    const { error } = await supabase.from('papelera_clima').insert(row);
-    if (error) console.error('dbPapeleraInsert:', error.message);
-  } else {
-    const p = loadPapeleraLocal(); p.unshift(entry); savePapeleraLocal(p);
-  }
-}
-
-async function dbPapeleraFind(id) {
-  if (supabase) {
-    const { data, error } = await supabase.from('papelera_clima')
-      .select('*').eq('id', id).single();
-    if (!error && data) return { ...fromClima(data), fechaEliminado: data.fecha_eliminado };
-  }
-  return loadPapeleraLocal().find(r => r.id === id) || null;
-}
-
-async function dbPapeleraDelete(id) {
-  if (supabase) {
-    const { error } = await supabase.from('papelera_clima').delete().eq('id', id);
-    if (error) console.error('dbPapeleraDelete:', error.message);
-  } else {
-    savePapeleraLocal(loadPapeleraLocal().filter(r => r.id !== id));
-  }
-}
-
-async function dbPapeleraClear() {
-  if (supabase) {
-    const { error } = await supabase.from('papelera_clima').delete().neq('id', '');
-    if (error) console.error('dbPapeleraClear:', error.message);
-  } else {
-    savePapeleraLocal([]);
-  }
-}
+// ── Informes + Papelera Clima ──────────────────────────────────
+const { list: dbClimaList, insert: dbClimaInsert, find: dbClimaFind, remove: dbClimaDelete,
+        papList: dbPapeleraList, papInsert: dbPapeleraInsert, papFind: dbPapeleraFind,
+        papDelete: dbPapeleraDelete, papClear: dbPapeleraClear } = makeRepo({
+  table: 'informes_clima', papelera: 'papelera_clima',
+  dbFile: DB_FILE, papeleraFile: PAPELERA_FILE,
+  from: fromClima, to: toClima,
+  searchFields: ['nombreSitio', 'codInforme', 'tecnico', 'numOT'],
+  papSearchFields: ['nombreSitio', 'codInforme', 'tecnico'],
+  delCol: 'fecha_eliminado', delKey: 'fechaEliminado'
+});
 
 // Logo base64 embedded
 const LOGO_B64 = fs.readFileSync(path.join(__dirname, 'logo.jpeg'), null) || null;
@@ -547,7 +528,7 @@ async function buildDocx(d) {
   const mw = Math.floor(TW/14);
   const row_med_h1 = new TableRow({ height:{value:260}, children:[
     HC('N° De Equipo', mw*2, 1, 2),
-    HC('Consumo Compresor COMP 1', mw*3, 4),
+    HC('Consumo Compresor', mw*3, 4),
     HC('Consumo Evaporador', mw*2, 2),
     HC('Consumo Condensador', mw*3, 4),
     HC('Temperatura', TW - mw*2 - mw*3 - mw*2 - mw*3, 3)
@@ -673,6 +654,42 @@ async function buildDocx(d) {
   return Packer.toBuffer(doc);
 }
 
+// ── Auto-envío de informes por correo ──────────────────────────
+// Configurable por variables de entorno (Render). Si faltan MAIL_USER/MAIL_PASS
+// el auto-envío queda desactivado y el sistema sigue funcionando normalmente.
+const MAIL_HOST = process.env.MAIL_HOST || 'smtp.gmail.com';
+const MAIL_PORT = parseInt(process.env.MAIL_PORT || '587', 10);
+const MAIL_TO   = process.env.MAIL_TO || process.env.MAIL_USER || '';
+
+let mailTransport = null;
+function getMailTransport() {
+  if (!process.env.MAIL_USER || !process.env.MAIL_PASS) return null;
+  if (!mailTransport) {
+    mailTransport = nodemailer.createTransport({
+      host: MAIL_HOST, port: MAIL_PORT, secure: MAIL_PORT === 465,
+      auth: { user: process.env.MAIL_USER, pass: process.env.MAIL_PASS }
+    });
+  }
+  return mailTransport;
+}
+
+// Envía el informe recién creado al correo configurado. No bloquea ni lanza:
+// si falla, solo registra el error para no afectar la descarga del usuario.
+async function autoEnviarInforme({ buffer, filename, subject, text }) {
+  const transport = getMailTransport();
+  if (!transport) { console.warn('✉️  Auto-envío desactivado: falta MAIL_USER o MAIL_PASS'); return; }
+  if (!MAIL_TO)   { console.warn('✉️  Auto-envío desactivado: falta MAIL_TO'); return; }
+  try {
+    await transport.sendMail({
+      from: process.env.MAIL_USER, to: MAIL_TO, subject, text,
+      attachments: [{ filename, content: buffer }]
+    });
+    console.log(`✉️  Informe enviado automáticamente a ${MAIL_TO}: ${filename}`);
+  } catch (err) {
+    console.error('✉️  Error en auto-envío de informe:', err.message);
+  }
+}
+
 // ── Routes ────────────────────────────────────────────────
 app.get('/ping', (req,res) => res.json({ok:true}));
 
@@ -722,10 +739,23 @@ app.post('/generar', heavyLimiter, async (req,res) => {
       codInforme: d.codInforme, nombreSitio: d.nombreSitio,
       codigoSitio: d.codigoSitio, tecnico: d.tecnico,
       supervisor: d.supervisor, numOT: d.numOT,
+      lpu: d.lpu, inc: d.ticketInc,
+      equipo: d.equipo, circuito: d.circuito,
+      tipoEquipo: d.eqTipo, marca: d.eqMarca,
       photoCount: (photos||[]).filter(Boolean).length,
       filename: fname
     };
     await dbClimaInsert(entry);
+
+    // Auto-envío por correo (fire-and-forget: no retrasa la descarga)
+    autoEnviarInforme({
+      buffer, filename: fname,
+      subject: `Nuevo informe Clima - ${(d.nombreSitio||'').trim()} - ${(d.codInforme||'').trim()}`.trim(),
+      text: `Se generó un nuevo informe correctivo de clima.\n\n` +
+            `Sitio: ${d.nombreSitio||'N/A'}\nCódigo informe: ${d.codInforme||'N/A'}\n` +
+            `Código sitio: ${d.codigoSitio||'N/A'}\nFecha: ${d.fecha||'N/A'}\n` +
+            `Técnico: ${d.tecnico||'N/A'}\nSupervisor: ${d.supervisor||'N/A'}\nN° OT: ${d.numOT||'N/A'}`
+    });
 
     res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition',`attachment; filename="${fname}"`);
@@ -863,34 +893,84 @@ function computeRangoPeriodo(periodo) {
 }
 
 const REPORTE_COLUMNAS_CLIMA = {
-  fecha: 'Fecha', codInforme: 'Código Informe', nombreSitio: 'Sitio',
-  codigoSitio: 'Código Sitio', tecnico: 'Técnico', supervisor: 'Supervisor',
-  numOT: 'OT', photoCount: 'Cant. Fotos'
+  fecha: 'Fecha', codInforme: 'Código Informe', lpu: 'LPU',
+  nombreSitio: 'Sitio', equipo: 'Equipo', circuito: 'Circuito',
+  tecnico: 'Técnico', tipoEquipo: 'Tipo de Equipo', marca: 'Marca',
+  inc: 'Incidencia (Inc)'
 };
 
-app.post('/reporte', async (req, res) => {
-  const { columns, periodo } = req.body;
-  if (!Array.isArray(columns) || !columns.length) {
-    return res.status(400).json({ error: 'Selecciona al menos una columna' });
+// ── Excel con estilo de tabla (cabecera color, bordes, zebra, anchos) ──
+const XL_AZUL = 'FF0073EA';   // cabecera
+const XL_ZEBRA = 'FFEAF3FF';  // filas pares
+const XL_BORDE = 'FFB9C4DE';  // líneas de la tabla
+function buildReporteExcel(colMap, validColumns, rows, sheetName = 'Historial') {
+  const headerRow = validColumns.map(c => colMap[c]);
+  const dataRows = rows.map(r => validColumns.map(c => String(r[c] ?? '')));
+  const ws = XLSXStyle.utils.aoa_to_sheet([headerRow, ...dataRows]);
+
+  const thin = { style: 'thin', color: { rgb: XL_BORDE } };
+  const border = { top: thin, bottom: thin, left: thin, right: thin };
+  const ncols = validColumns.length;
+
+  for (let R = 0; R <= dataRows.length; R++) {
+    for (let C = 0; C < ncols; C++) {
+      const ref = XLSXStyle.utils.encode_cell({ r: R, c: C });
+      if (!ws[ref]) ws[ref] = { t: 's', v: '' };
+      if (R === 0) {
+        ws[ref].s = {
+          font: { bold: true, sz: 11, color: { rgb: 'FFFFFFFF' }, name: 'Calibri' },
+          fill: { patternType: 'solid', fgColor: { rgb: XL_AZUL } },
+          alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+          border
+        };
+      } else {
+        ws[ref].s = {
+          font: { sz: 10, color: { rgb: 'FF323338' }, name: 'Calibri' },
+          fill: { patternType: 'solid', fgColor: { rgb: R % 2 === 0 ? XL_ZEBRA : 'FFFFFFFF' } },
+          alignment: { horizontal: 'left', vertical: 'center', wrapText: false },
+          border
+        };
+      }
+    }
   }
-  const validColumns = columns.filter(c => REPORTE_COLUMNAS_CLIMA[c]);
-  if (!validColumns.length) return res.status(400).json({ error: 'Columnas inválidas' });
-  const rango = computeRangoPeriodo(periodo);
-  if (rango.error) return res.status(400).json({ error: rango.error });
-  const all = await dbClimaList(null);
-  const selected = rango.inicio
-    ? all.filter(r => { const f = new Date(r.fechaCreacion); return f >= rango.inicio && f <= rango.fin; })
-    : all;
-  const headerRow = validColumns.map(c => REPORTE_COLUMNAS_CLIMA[c]);
-  const dataRows = selected.map(r => validColumns.map(c => r[c] ?? ''));
-  const ws = XLSX.utils.aoa_to_sheet([headerRow, ...dataRows]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Historial');
-  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', 'attachment; filename="reporte-tigo.xlsx"');
-  res.send(buffer);
-});
+
+  // Anchos de columna = ajuste al contenido (margen de +2, entre 12 y 45)
+  ws['!cols'] = validColumns.map((c, i) => {
+    const lens = [colMap[c].length, ...dataRows.map(row => (row[i] || '').length)];
+    return { wch: Math.min(Math.max(Math.max(...lens) + 2, 12), 45) };
+  });
+  ws['!rows'] = [{ hpt: 22 }];  // alto de cabecera
+  const lastCol = XLSXStyle.utils.encode_col(ncols - 1);
+  ws['!autofilter'] = { ref: `A1:${lastCol}${dataRows.length + 1}` };
+
+  const wb = XLSXStyle.utils.book_new();
+  XLSXStyle.utils.book_append_sheet(wb, ws, sheetName);
+  return XLSXStyle.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
+
+// Handler genérico de reporte (Clima y WOM comparten lógica)
+function reporteHandler(colMap, listFn, filename) {
+  return async (req, res) => {
+    const { columns, periodo } = req.body;
+    if (!Array.isArray(columns) || !columns.length) {
+      return res.status(400).json({ error: 'Selecciona al menos una columna' });
+    }
+    const validColumns = columns.filter(c => colMap[c]);
+    if (!validColumns.length) return res.status(400).json({ error: 'Columnas inválidas' });
+    const rango = computeRangoPeriodo(periodo);
+    if (rango.error) return res.status(400).json({ error: rango.error });
+    const all = await listFn();
+    const selected = rango.inicio
+      ? all.filter(r => { const f = new Date(r.fechaCreacion); return f >= rango.inicio && f <= rango.fin; })
+      : all;
+    const buffer = buildReporteExcel(colMap, validColumns, selected);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  };
+}
+
+app.post('/reporte', reporteHandler(REPORTE_COLUMNAS_CLIMA, () => dbClimaList(null), 'reporte-tigo.xlsx'));
 
 // ═══════════════════════════════════════════════════════════════
 // MÓDULO WOM
@@ -904,12 +984,6 @@ if (!fs.existsSync(DOCS_DIR_WOM))      fs.mkdirSync(DOCS_DIR_WOM);
 if (!fs.existsSync(PAPELERA_DIR_WOM))  fs.mkdirSync(PAPELERA_DIR_WOM);
 if (!fs.existsSync(DB_FILE_WOM))       fs.writeFileSync(DB_FILE_WOM, '[]');
 if (!fs.existsSync(PAPELERA_FILE_WOM)) fs.writeFileSync(PAPELERA_FILE_WOM, '[]');
-
-// ── Local fallback helpers WOM ─────────────────────────────────
-function loadDBWomLocal()        { try { return JSON.parse(fs.readFileSync(DB_FILE_WOM,'utf8')); }        catch { return []; } }
-function saveDBWomLocal(d)       { fs.writeFileSync(DB_FILE_WOM, JSON.stringify(d, null, 2)); }
-function loadPapeleraWomLocal()  { try { return JSON.parse(fs.readFileSync(PAPELERA_FILE_WOM,'utf8')); }  catch { return []; } }
-function savePapeleraWomLocal(d) { fs.writeFileSync(PAPELERA_FILE_WOM, JSON.stringify(d, null, 2)); }
 
 // ── Row mappers – WOM ──────────────────────────────────────────
 const fromWom = r => ({
@@ -927,97 +1001,23 @@ const toWom = e => ({
   photo_count: e.photoCount, filename: e.filename
 });
 
-// ── Async DB – Informes WOM ────────────────────────────────────
-async function dbWomList() {
-  if (supabase) {
-    const { data, error } = await supabase.from('informes_wom')
-      .select('*').order('fecha_creacion', { ascending: false });
-    if (!error) return (data||[]).map(fromWom);
-    console.error('dbWomList:', error.message);
-  }
-  return loadDBWomLocal();
-}
-
-async function dbWomInsert(entry) {
-  if (supabase) {
-    const { error } = await supabase.from('informes_wom').insert(toWom(entry));
-    if (error) console.error('dbWomInsert:', error.message);
-  } else {
-    const db = loadDBWomLocal(); db.unshift(entry); saveDBWomLocal(db);
-  }
-}
-
-async function dbWomFind(id) {
-  if (supabase) {
-    const { data, error } = await supabase.from('informes_wom')
-      .select('*').eq('id', id).single();
-    if (!error && data) return fromWom(data);
-  }
-  return loadDBWomLocal().find(r => r.id === id) || null;
-}
-
-async function dbWomDelete(id) {
-  if (supabase) {
-    const { error } = await supabase.from('informes_wom').delete().eq('id', id);
-    if (error) console.error('dbWomDelete:', error.message);
-  } else {
-    saveDBWomLocal(loadDBWomLocal().filter(r => r.id !== id));
-  }
-}
-
-// ── Async DB – Papelera WOM ────────────────────────────────────
-async function dbPapeleraWomList() {
-  if (supabase) {
-    const { data, error } = await supabase.from('papelera_wom')
-      .select('*').order('deleted_at', { ascending: false });
-    if (!error) return (data||[]).map(r => ({ ...fromWom(r), deletedAt: r.deleted_at }));
-    console.error('dbPapeleraWomList:', error.message);
-  }
-  return loadPapeleraWomLocal();
-}
-
-async function dbPapeleraWomInsert(entry) {
-  if (supabase) {
-    const { error } = await supabase.from('papelera_wom')
-      .insert({ ...toWom(entry), deleted_at: entry.deletedAt });
-    if (error) console.error('dbPapeleraWomInsert:', error.message);
-  } else {
-    const p = loadPapeleraWomLocal(); p.unshift(entry); savePapeleraWomLocal(p);
-  }
-}
-
-async function dbPapeleraWomFind(id) {
-  if (supabase) {
-    const { data, error } = await supabase.from('papelera_wom')
-      .select('*').eq('id', id).single();
-    if (!error && data) return { ...fromWom(data), deletedAt: data.deleted_at };
-  }
-  return loadPapeleraWomLocal().find(r => r.id === id) || null;
-}
-
-async function dbPapeleraWomDelete(id) {
-  if (supabase) {
-    const { error } = await supabase.from('papelera_wom').delete().eq('id', id);
-    if (error) console.error('dbPapeleraWomDelete:', error.message);
-  } else {
-    savePapeleraWomLocal(loadPapeleraWomLocal().filter(r => r.id !== id));
-  }
-}
-
-async function dbPapeleraWomClear() {
-  if (supabase) {
-    const { error } = await supabase.from('papelera_wom').delete().neq('id', '');
-    if (error) console.error('dbPapeleraWomClear:', error.message);
-  } else {
-    savePapeleraWomLocal([]);
-  }
-}
+// ── Informes + Papelera WOM ────────────────────────────────────
+const { list: dbWomList, insert: dbWomInsert, find: dbWomFind, remove: dbWomDelete,
+        papList: dbPapeleraWomList, papInsert: dbPapeleraWomInsert, papFind: dbPapeleraWomFind,
+        papDelete: dbPapeleraWomDelete, papClear: dbPapeleraWomClear } = makeRepo({
+  table: 'informes_wom', papelera: 'papelera_wom',
+  dbFile: DB_FILE_WOM, papeleraFile: PAPELERA_FILE_WOM,
+  from: fromWom, to: toWom,
+  delCol: 'deleted_at', delKey: 'deletedAt'
+});
 
 const RSO_SITES = {
   'RSO CONCEPCION':   'ANIBAL PINTO 105, CONCEPCION',
   'RSO ANTOFAGASTA':  'FELIX GARCIA 581, ANTOFAGASTA',
   'RSO PUERTO MONTT': 'AV LO CELIS S/N PUERTO MONTT',
-  'RSO PUNTA ARENAS': 'AV PDTE EDUARDO FREI MONTALVA 5, PUNTA ARENAS'
+  'RSO PUNTA ARENAS': 'AV PDTE EDUARDO FREI MONTALVA 5, PUNTA ARENAS',
+  'MSO ROSAS':        'ROSAS 2451, SANTIAGO CENTRO',
+  'MSO QUILICURA':    'AV CAÑAVERAL 34, QUILICURA'
 };
 
 const ACTIVIDADES_WOM = [
@@ -1335,191 +1335,6 @@ async function buildDocxWom(d) {
   return await Packer.toBuffer(doc);
 }
 
-// ── (old buildDocxWom removed — replaced above) ──────────────
-async function buildDocxWom_UNUSED(d) {
-  const v  = s => (s||'').toString().trim();
-  const WTW   = 9869;
-  const wCol  = Math.floor(WTW / 10);
-  const W_BC  = '7B7B7B';
-  const W_LBL = 'D6E4F0';
-  const W_GRY = 'D9D9D9';
-  const W_BLU = '1A3A6C';
-  const W_GRN = '2E7D32';
-  const W_MAG = 'E2007A';
-
-  const thinW  = (c=W_BC) => ({ style: BorderStyle.SINGLE, size: 12, color: c });
-  const allW   = { top: thinW(), bottom: thinW(), left: thinW(), right: thinW() };
-  const thinBl = (c=W_BLU) => ({ style: BorderStyle.SINGLE, size: 12, color: c });
-  const allBl  = { top: thinBl(), bottom: thinBl(), left: thinBl(), right: thinBl() };
-
-  const para = (runs, center=false) => new Paragraph({
-    alignment: center ? AlignmentType.CENTER : AlignmentType.LEFT,
-    spacing: { before: 0, after: 0 },
-    children: Array.isArray(runs) ? runs : [runs]
-  });
-  const run  = (text, opts={}) => new TextRun({ text: text||'', size: opts.sz||16, font: 'Calibri',
-    bold: opts.bold||false, italics: opts.italics||false, color: opts.color||'000000' });
-
-  const WL = (text, span=1) => new TableCell({
-    width: { size: wCol*span, type: WidthType.DXA }, ...(span>1?{columnSpan:span}:{}),
-    borders: allW, shading: { fill: W_LBL, type: ShadingType.CLEAR },
-    verticalAlign: VerticalAlign.CENTER,
-    margins: { top:40, bottom:40, left:70, right:40 },
-    children: [para(run(text, { bold:true, sz:16 }))]
-  });
-  const WV = (text, span=1, opts={}) => new TableCell({
-    width: { size: wCol*span, type: WidthType.DXA }, ...(span>1?{columnSpan:span}:{}),
-    borders: allW, verticalAlign: VerticalAlign.CENTER,
-    margins: { top:40, bottom:40, left:70, right:40 },
-    children: [para(run(text, { sz:16, bold:opts.bold||false, color:opts.color||'000000' }), opts.center||false)]
-  });
-  const wSecRow = (text) => new TableRow({ height:{value:300}, children:[new TableCell({
-    width:{size:WTW,type:WidthType.DXA}, columnSpan:10,
-    borders:allW, shading:{fill:W_GRY,type:ShadingType.CLEAR},
-    verticalAlign:VerticalAlign.CENTER, margins:{top:40,bottom:40,left:100,right:40},
-    children:[para(run(text,{bold:true,sz:18}))]
-  })]});
-
-  // ── Header con logo ──────────────────────────────────────
-  let headerTable = null;
-  try {
-    let logoPath = path.join(__dirname, 'logo.png');
-    if (!fs.existsSync(logoPath)) logoPath = path.join(__dirname, 'logo.jpeg');
-    const logoData = fs.readFileSync(logoPath);
-    headerTable = new Table({
-      width: { size: WTW, type: WidthType.DXA },
-      columnWidths: [2400, 5069, 2400],
-      borders: { top:thinBl(),bottom:thinBl(),left:thinBl(),right:thinBl(),insideH:thinBl(),insideV:thinBl() },
-      rows: [new TableRow({ height:{value:820}, children:[
-        new TableCell({
-          width:{size:2400,type:WidthType.DXA}, borders:allBl,
-          shading:{fill:W_BLU,type:ShadingType.CLEAR},
-          verticalAlign:VerticalAlign.CENTER, margins:{top:60,bottom:60,left:100,right:100},
-          children:[para(new ImageRun({ data:logoData, transformation:{width:100,height:44} }), true)]
-        }),
-        new TableCell({
-          width:{size:5069,type:WidthType.DXA}, borders:allBl,
-          shading:{fill:W_BLU,type:ShadingType.CLEAR},
-          verticalAlign:VerticalAlign.CENTER, margins:{top:40,bottom:40,left:60,right:60},
-          children:[para(run('ORDEN DE TRABAJO',{bold:true,sz:28,color:'FFFFFF'}), true)]
-        }),
-        new TableCell({
-          width:{size:2400,type:WidthType.DXA}, borders:allBl,
-          shading:{fill:W_MAG,type:ShadingType.CLEAR},
-          verticalAlign:VerticalAlign.CENTER, margins:{top:40,bottom:40,left:60,right:60},
-          children:[para(run('WOM',{bold:true,sz:36,color:'FFFFFF',italics:true}), true)]
-        })
-      ]})]
-    });
-  } catch(e) { /* logo opcional */ }
-
-  // ── Código Interno (verde si hay valor) ─────────────────
-  const codVal = v(d.codInterno);
-  const codCell = new TableCell({
-    width:{size:wCol*3,type:WidthType.DXA}, columnSpan:3,
-    borders:allW, verticalAlign:VerticalAlign.CENTER,
-    margins:{top:40,bottom:40,left:70,right:40},
-    children:[para(codVal ? run(`INC-${codVal}`,{bold:true,sz:18,color:W_GRN}) : run('',{sz:16}))]
-  });
-
-  // ── Trabajos: split por saltos de línea ─────────────────
-  const trabajosParas = (v(d.trabajos)||'').split('\n').filter(l=>l.trim()).map(line =>
-    new Paragraph({ spacing:{before:0,after:60}, children:[run(line.trim(),{sz:16})] })
-  );
-  if (!trabajosParas.length) trabajosParas.push(new Paragraph({spacing:{before:0,after:0},children:[run('',{sz:16})]}));
-
-  // ── Técnicos ────────────────────────────────────────────
-  const tecnicosStr = (d.tecnicos||[]).filter(Boolean).join('    /    ');
-
-  // ── Fotos ────────────────────────────────────────────────
-  const photos   = d.photos   || [];
-  const captions = d.captions || [];
-  const photoRows = [];
-  for (let r = 0; r < 4; r++) {
-    const i1 = r*2, i2 = r*2+1;
-    const p1 = photos[i1], p2 = photos[i2];
-    if (!p1 && !p2) continue;
-    const mkPhotoCell = (b64) => {
-      const halfW = Math.floor(WTW/2);
-      if (!b64) return new TableCell({
-        width:{size:halfW,type:WidthType.DXA},columnSpan:5,
-        borders:allW,verticalAlign:VerticalAlign.CENTER,
-        margins:{top:40,bottom:40,left:40,right:40},
-        children:[para(run('',{sz:16}))]
-      });
-      try {
-        const buf = Buffer.from(b64.replace(/^data:image\/\w+;base64,/,''),'base64');
-        return new TableCell({
-          width:{size:halfW,type:WidthType.DXA},columnSpan:5,
-          borders:allW,verticalAlign:VerticalAlign.CENTER,
-          margins:{top:40,bottom:40,left:40,right:40},
-          children:[para(new ImageRun({data:buf,transformation:{width:250,height:185}}),true)]
-        });
-      } catch { return new TableCell({
-        width:{size:Math.floor(WTW/2),type:WidthType.DXA},columnSpan:5,
-        borders:allW,children:[para(run('[error foto]',{sz:14}))]
-      }); }
-    };
-    const mkCapCell = (idx) => new TableCell({
-      width:{size:Math.floor(WTW/2),type:WidthType.DXA},columnSpan:5,
-      borders:allW,verticalAlign:VerticalAlign.CENTER,
-      margins:{top:30,bottom:30,left:70,right:40},
-      children:[para(run(captions[idx]||'',{sz:14,italics:true}),true)]
-    });
-    photoRows.push(new TableRow({height:{value:2200},children:[mkPhotoCell(p1),mkPhotoCell(p2)]}));
-    photoRows.push(new TableRow({height:{value:270},children:[mkCapCell(i1),mkCapCell(i2)]}));
-  }
-
-  // ── Tabla principal ──────────────────────────────────────
-  const mainTable = new Table({
-    width:{size:WTW,type:WidthType.DXA},
-    columnWidths: Array(10).fill(wCol),
-    borders:{top:thinW(),bottom:thinW(),left:thinW(),right:thinW(),insideH:thinW(),insideV:thinW()},
-    rows:[
-      new TableRow({height:{value:320},children:[WL('Código Interno',2),codCell,WL('Ticket',2),WV(v(d.ticket),3)]}),
-      new TableRow({height:{value:300},children:[WL('Fecha OT',2),WV(`Inicio:   ${v(d.fechaInicio)}   ${v(d.horaInicio)}`,4),WV(`Término:   ${v(d.fechaTermino)}   ${v(d.horaTermino)}`,4)]}),
-      new TableRow({height:{value:300},children:[WL('Cliente',2),WV('WOM',8,{bold:true})]}),
-      new TableRow({height:{value:300},children:[WL('Infraestructura',2),WV(v(d.infraestructura),8)]}),
-      new TableRow({height:{value:300},children:[WL('Tipo de actividad',2),WV(v(d.tipoActividad),8)]}),
-      new TableRow({height:{value:300},children:[WL('Instalación',2),WV(v(d.instalacion),3),WL('Dirección',2),WV(v(d.direccion),3)]}),
-      wSecRow('Trabajos Realizados'),
-      new TableRow({height:{value:1600},children:[new TableCell({
-        width:{size:WTW,type:WidthType.DXA},columnSpan:10,
-        borders:allW,margins:{top:60,bottom:60,left:100,right:100},
-        children:trabajosParas
-      })]}),
-      wSecRow('Observaciones'),
-      new TableRow({height:{value:1200},children:[new TableCell({
-        width:{size:WTW,type:WidthType.DXA},columnSpan:10,
-        borders:allW,margins:{top:60,bottom:60,left:100,right:100},
-        children:[para(run(v(d.observaciones)||'Sin observaciones adicionales',{sz:16}))]
-      })]}),
-      wSecRow('Técnico(s) Responsable(s)'),
-      new TableRow({height:{value:350},children:[WL('Nombre y Apellido:',2),WV(tecnicosStr,8)]}),
-      new TableRow({height:{value:300},children:[WL('Sala:',1),WV(v(d.sala),2),WL('Equipo:',1),WV(v(d.equipo),2),WL('Marca:',1),WV(v(d.marca),2),WL('Modelo:',1),WV(v(d.modelo),1)]}),
-      wSecRow('RESUMEN DE ACTIVIDAD'),
-      new TableRow({height:{value:1400},children:[
-        new TableCell({width:{size:Math.floor(WTW/2),type:WidthType.DXA},columnSpan:5,borders:allW,margins:{top:60,bottom:60,left:100,right:100},children:[para(run(v(d.resumen1),{sz:16}))]}),
-        new TableCell({width:{size:Math.floor(WTW/2),type:WidthType.DXA},columnSpan:5,borders:allW,margins:{top:60,bottom:60,left:100,right:100},children:[para(run(v(d.resumen2),{sz:16}))]})
-      ]}),
-      ...(photoRows.length ? [wSecRow('REGISTRO FOTOGRÁFICO'),...photoRows] : [])
-    ]
-  });
-
-  const sections = [];
-  if (headerTable) sections.push(headerTable);
-  sections.push(new Paragraph({spacing:{before:0,after:80},children:[]}));
-  sections.push(mainTable);
-
-  const doc = new Document({
-    sections:[{
-      properties:{ page:{ margin:{top:720,right:720,bottom:720,left:720}, size:{width:12240,height:15840} } },
-      children: sections
-    }]
-  });
-  return await Packer.toBuffer(doc);
-}
-
 // ── WOM Routes ─────────────────────────────────────────────────
 app.get('/sitios-rso', (_req, res) => res.json(RSO_SITES));
 app.get('/actividades-wom', (_req, res) => res.json(ACTIVIDADES_WOM));
@@ -1545,6 +1360,17 @@ app.post('/generar-wom', heavyLimiter, async (req, res) => {
       filename: fname
     };
     await dbWomInsert(entry);
+
+    // Auto-envío por correo (fire-and-forget: no retrasa la descarga)
+    autoEnviarInforme({
+      buffer, filename: fname,
+      subject: `Nuevo informe WOM - ${(d.ticket||'').trim()}`.trim(),
+      text: `Se generó un nuevo informe WOM.\n\n` +
+            `Ticket: ${d.ticket||'N/A'}\nCódigo interno: ${d.codInterno||'N/A'}\n` +
+            `Instalación: ${d.instalacion||'N/A'}\nFecha inicio: ${d.fechaInicio||'N/A'}\n` +
+            `Tipo actividad: ${d.tipoActividad||'N/A'}\n` +
+            `Técnicos: ${(d.tecnicos||[]).filter(Boolean).join(', ')||'N/A'}`
+    });
 
     res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition',`attachment; filename="${fname}"`);
@@ -1628,29 +1454,7 @@ const REPORTE_COLUMNAS_WOM = {
   tecnicos: 'Técnicos', photoCount: 'Cant. Fotos'
 };
 
-app.post('/reporte-wom', async (req, res) => {
-  const { columns, periodo } = req.body;
-  if (!Array.isArray(columns) || !columns.length) {
-    return res.status(400).json({ error: 'Selecciona al menos una columna' });
-  }
-  const validColumns = columns.filter(c => REPORTE_COLUMNAS_WOM[c]);
-  if (!validColumns.length) return res.status(400).json({ error: 'Columnas inválidas' });
-  const rango = computeRangoPeriodo(periodo);
-  if (rango.error) return res.status(400).json({ error: rango.error });
-  const all = await dbWomList();
-  const selected = rango.inicio
-    ? all.filter(r => { const f = new Date(r.fechaCreacion); return f >= rango.inicio && f <= rango.fin; })
-    : all;
-  const headerRow = validColumns.map(c => REPORTE_COLUMNAS_WOM[c]);
-  const dataRows = selected.map(r => validColumns.map(c => r[c] ?? ''));
-  const ws = XLSX.utils.aoa_to_sheet([headerRow, ...dataRows]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Historial');
-  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', 'attachment; filename="reporte-wom.xlsx"');
-  res.send(buffer);
-});
+app.post('/reporte-wom', reporteHandler(REPORTE_COLUMNAS_WOM, () => dbWomList(), 'reporte-wom.xlsx'));
 
 const PORT = process.env.PORT || 3000;
 const os = require('os');

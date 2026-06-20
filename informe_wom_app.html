@@ -82,7 +82,9 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 
 /* ── TÉCNICOS ── */
 .tecnico-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
-.tecnico-row input{flex:1;}
+.tecnico-row input,.tecnico-row select{flex:1;width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;color:var(--text);background:#fff;outline:none;transition:border-color .18s,box-shadow .18s;}
+.tecnico-row select{appearance:none;-webkit-appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:34px;}
+.tecnico-row input:focus,.tecnico-row select:focus{border-color:var(--mag);box-shadow:0 0 0 3px rgba(120,75,209,.12);}
 .btn-icon{background:none;border:none;cursor:pointer;padding:6px;border-radius:6px;color:var(--muted);font-size:16px;transition:background .15s,color .15s;}
 .btn-icon:hover{background:#f1f5f9;color:var(--red);}
 .btn-add-tec{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--mag);background:var(--mag-l);border:1.5px dashed var(--mag-b);border-radius:10px;padding:9px 14px;cursor:pointer;width:100%;justify-content:center;margin-top:4px;transition:background .15s;}
@@ -321,6 +323,8 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
           <option value="RSO ANTOFAGASTA">RSO ANTOFAGASTA</option>
           <option value="RSO PUERTO MONTT">RSO PUERTO MONTT</option>
           <option value="RSO PUNTA ARENAS">RSO PUNTA ARENAS</option>
+          <option value="MSO ROSAS">MSO ROSAS</option>
+          <option value="MSO QUILICURA">MSO QUILICURA</option>
         </select>
       </div>
       <div class="field">
@@ -475,8 +479,16 @@ const RSO = {
   'RSO CONCEPCION':   'ANIBAL PINTO 105, CONCEPCION',
   'RSO ANTOFAGASTA':  'FELIX GARCIA 581, ANTOFAGASTA',
   'RSO PUERTO MONTT': 'AV LO CELIS S/N PUERTO MONTT',
-  'RSO PUNTA ARENAS': 'AV PDTE EDUARDO FREI MONTALVA 5, PUNTA ARENAS'
+  'RSO PUNTA ARENAS': 'AV PDTE EDUARDO FREI MONTALVA 5, PUNTA ARENAS',
+  'MSO ROSAS':        'ROSAS 2451, SANTIAGO CENTRO',
+  'MSO QUILICURA':    'AV CAÑAVERAL 34, QUILICURA'
 };
+
+// ── Técnicos (misma lista que proyecto Tigo) ─────────────────
+const TECHNICIANS = [
+  'Yoscar Garcia','Elias Alburto','Diego Riquelme','Rodrigo Guerrero',
+  'Armin Yaitul','Jairo Alarcon','Jean Marasi'
+];
 
 // ── Tab navigation ───────────────────────────────────────────
 // Tab 0=Inicio, 1=OT, 2=Trabajos, 3=Resumen/Fotos, 4=Historial
@@ -619,10 +631,14 @@ function addTecnico(name='') {
   const list = g('tecnicos-list');
   const div  = document.createElement('div');
   div.className = 'tecnico-row';
-  div.innerHTML = `<input class="tec-input" type="text" placeholder="Nombre y Apellido" value="${name}">
+  // Si el nombre guardado no está en la lista (legacy), se preserva como opción extra
+  const names = (name && !TECHNICIANS.includes(name)) ? [name, ...TECHNICIANS] : TECHNICIANS;
+  const opts = ['<option value="">— Seleccionar técnico —</option>']
+    .concat(names.map(t => `<option value="${t}"${t===name?' selected':''}>${t}</option>`))
+    .join('');
+  div.innerHTML = `<select class="tec-input">${opts}</select>
     <button class="btn-icon" onclick="this.parentElement.remove()" title="Eliminar">✕</button>`;
   list.appendChild(div);
-  div.querySelector('input').focus();
 }
 
 // ── Fotos ────────────────────────────────────────────────────
