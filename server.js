@@ -166,8 +166,9 @@ function makeRepo({ table, papelera, dbFile, papeleraFile, from, to,
     async remove(id) {
       if (supabase) {
         try {
-          const { error } = await supabase.from(table).delete().eq('id', id);
+          const { data, error } = await supabase.from(table).delete().eq('id', id).select();
           if (error) { console.error(`${table} delete:`, error); return { error: `${table}: ${error.message}${error.hint ? ' ('+error.hint+')' : ''}` }; }
+          if (!data || !data.length) return { error: `${table}: Supabase no borró ninguna fila (falta política RLS de DELETE o usa la clave service_role en Render).` };
         } catch (e) { console.error(`${table} delete (excepción):`, e); return { error: `${table}: ${e.message || e}` }; }
       } else { saveDB(loadDB().filter(r => r.id !== id)); }
       return { ok: true };
@@ -199,8 +200,9 @@ function makeRepo({ table, papelera, dbFile, papeleraFile, from, to,
     async papDelete(id) {
       if (supabase) {
         try {
-          const { error } = await supabase.from(papelera).delete().eq('id', id);
+          const { data, error } = await supabase.from(papelera).delete().eq('id', id).select();
           if (error) { console.error(`${papelera} delete:`, error); return { error: `${papelera}: ${error.message}${error.hint ? ' ('+error.hint+')' : ''}` }; }
+          if (!data || !data.length) return { error: `${papelera}: Supabase no borró ninguna fila (falta política RLS de DELETE o usa la clave service_role en Render).` };
         } catch (e) { console.error(`${papelera} delete (excepción):`, e); return { error: `${papelera}: ${e.message || e}` }; }
       } else { savePap(loadPap().filter(r => r.id !== id)); }
       return { ok: true };
