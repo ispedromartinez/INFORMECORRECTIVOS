@@ -685,10 +685,12 @@ async function buildDocx(d) {
 //   MAIL_FROM = remitente verificado en Brevo (Brevo rechaza enviar desde MAIL_USER)
 const MAIL_HOST = process.env.MAIL_HOST || 'smtp.gmail.com';
 const MAIL_PORT = parseInt(process.env.MAIL_PORT || '587', 10);
-const MAIL_TO   = process.env.MAIL_TO || process.env.MAIL_USER || '';
+// .trim() defensivo: en Render es fácil dejar un espacio al copiar/pegar y Brevo
+// rechaza el envío con "email is not valid". Soporta varios destinos por coma.
+const MAIL_TO   = (process.env.MAIL_TO || process.env.MAIL_USER || '').trim();
 // Remitente del correo. En Gmail/Outlook coincide con el login; en Brevo debe ser
 // una dirección verificada distinta del login SMTP.
-const MAIL_FROM = process.env.MAIL_FROM || process.env.MAIL_USER || '';
+const MAIL_FROM = (process.env.MAIL_FROM || process.env.MAIL_USER || '').trim();
 
 // API HTTP de Brevo. Render gratis BLOQUEA los puertos SMTP salientes (25/465/587),
 // así que en producción el envío debe ir por la API (HTTPS, puerto 443).
@@ -719,9 +721,11 @@ function mailConfigured() {
 
 // Envío vía API HTTP de Brevo (no usa SMTP, funciona en Render gratis).
 async function sendViaBrevoApi({ from, to, subject, text, filename, buffer }) {
+  // Acepta uno o varios destinatarios separados por coma (limpia espacios y vacíos).
+  const recipients = String(to).split(',').map(e => e.trim()).filter(Boolean).map(email => ({ email }));
   const body = {
     sender: { email: from },
-    to: [{ email: to }],
+    to: recipients,
     subject,
     textContent: text
   };
