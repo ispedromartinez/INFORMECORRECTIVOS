@@ -1828,7 +1828,6 @@ function renderHist(records){
         </div>
         <div class="inf-actions">
           <button class="act-btn act-dl" onclick="downloadRecord('${r.id}')">⬇ Descargar</button>
-          <button class="act-btn act-em" onclick="openEmailModal('${r.id}','${(r.nombreSitio||'').replace(/'/g,"\\'")}','${r.codInforme||''}')">✉️ Enviar</button>
           <button class="act-btn act-del" onclick="openConfirm('${r.id}','${(r.nombreSitio||'').replace(/'/g,"\\'")}')">🗑️ Borrar</button>
         </div>
       </div>
