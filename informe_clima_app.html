@@ -1935,9 +1935,15 @@ function openConfirmPerm(id, sitio) {
 function closeConfirmPerm(){ document.getElementById('confirmPerm').classList.remove('open'); pendingPermId=null; }
 async function confirmPermDelete() {
   if(!pendingPermId) return;
+  const id = pendingPermId;
   closeConfirmPerm();
   try {
-    await fetch(`${SERVER}/papelera/${pendingPermId}`, {method:'DELETE'});
+    const resp = await fetch(`${SERVER}/papelera/${id}`, {method:'DELETE'});
+    if(!resp.ok){
+      let msg='Error '+resp.status;
+      try{const t=await resp.text();try{const j=JSON.parse(t);if(j&&j.error)msg=j.error;}catch{if(t)msg=t.slice(0,300);}}catch{}
+      alert('No se pudo borrar definitivamente:\n'+msg);
+    }
     await loadPapelera();
   } catch(e){ alert('Error: '+e.message); }
 }
@@ -1947,7 +1953,12 @@ function closeConfirmVaciar(){ document.getElementById('confirmVaciar').classLis
 async function confirmVaciar(){
   closeConfirmVaciar();
   try{
-    await fetch(`${SERVER}/papelera`, {method:'DELETE'});
+    const resp = await fetch(`${SERVER}/papelera`, {method:'DELETE'});
+    if(!resp.ok){
+      let msg='Error '+resp.status;
+      try{const t=await resp.text();try{const j=JSON.parse(t);if(j&&j.error)msg=j.error;}catch{if(t)msg=t.slice(0,300);}}catch{}
+      alert('No se pudo vaciar la papelera:\n'+msg);
+    }
     await loadPapelera();
   } catch(e){ alert('Error: '+e.message); }
 }
