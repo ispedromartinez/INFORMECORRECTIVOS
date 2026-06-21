@@ -967,7 +967,14 @@ async function eliminar(id, btn) {
   if (!confirm('¿Mover este informe a la papelera?')) return;
   btn.disabled = true;
   try {
-    await fetch(`/registro-wom/${id}`, { method:'DELETE' });
+    const resp = await fetch(`/registro-wom/${id}`, { method:'DELETE' });
+    if (!resp.ok) {
+      let msg = 'Error ' + resp.status;
+      try { const t = await resp.text(); try { const j = JSON.parse(t); if (j && j.error) msg = j.error; } catch { if (t) msg = t.slice(0,300); } } catch {}
+      toast('No se pudo borrar: ' + msg, 'err');
+      btn.disabled = false;
+      return;
+    }
     toast('Informe movido a papelera');
     loadHistorial();
   } catch { toast('Error al eliminar','err'); btn.disabled = false; }
