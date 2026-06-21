@@ -718,6 +718,28 @@ async function autoEnviarInforme({ buffer, filename, subject, text }) {
 // ── Routes ────────────────────────────────────────────────
 app.get('/ping', (req,res) => res.json({ok:true}));
 
+// Prueba de configuración de correo: envía un email de test a MAIL_TO.
+// Uso: abrir /probar-correo en el navegador. Devuelve el resultado real.
+app.get('/probar-correo', async (req, res) => {
+  const transport = getMailTransport();
+  if (!transport) {
+    return res.json({ ok: false, error: 'Auto-envío desactivado: falta MAIL_USER o MAIL_PASS en las variables de entorno.' });
+  }
+  if (!MAIL_TO) {
+    return res.json({ ok: false, error: 'Falta MAIL_TO (y MAIL_USER) para saber a quién enviar.' });
+  }
+  try {
+    await transport.sendMail({
+      from: process.env.MAIL_USER, to: MAIL_TO,
+      subject: '✅ Prueba de correo - Informes ICETEL',
+      text: `Este es un correo de prueba.\n\nSi lo recibiste, el auto-envío de informes está configurado correctamente.\n\nServidor SMTP: ${MAIL_HOST}:${MAIL_PORT}\nRemitente: ${process.env.MAIL_USER}\nDestino: ${MAIL_TO}\nFecha: ${new Date().toLocaleString()}`
+    });
+    res.json({ ok: true, mensaje: `Correo de prueba enviado correctamente a ${MAIL_TO}. Revisa tu bandeja (y spam).`, host: MAIL_HOST, port: MAIL_PORT });
+  } catch (err) {
+    res.json({ ok: false, error: err.message, host: MAIL_HOST, port: MAIL_PORT, sugerencia: 'Verifica MAIL_USER, que MAIL_PASS sea una contraseña de aplicación, y MAIL_HOST/MAIL_PORT.' });
+  }
+});
+
 app.get('/ping-supabase', async (req, res) => {
   if (!supabase) return res.json({ ok: false, error: 'SUPABASE_URL o SUPABASE_KEY no configuradas' });
   const { error } = await supabase.from('informes_clima').select('id').limit(1);
