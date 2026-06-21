@@ -142,7 +142,35 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 .btn-dl:hover{background:#f9d0e8;}
 .btn-del{background:#fff0f0;color:var(--red);border:1.5px solid #fecaca;border-radius:10px;padding:6px 10px;font-size:11px;cursor:pointer;transition:background .15s;}
 .btn-del:hover{background:#fee2e2;}
-.hist-empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.07),0 4px 16px rgba(0,0,0,.05);}
+.hist-empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;}
+.hist-empty .ei{font-size:44px;margin-bottom:12px;}
+
+/* ── INFORME CARDS (mismo estilo que Tigo) ── */
+.inf-card{background:var(--white);border-radius:10px;box-shadow:var(--sh);margin-bottom:10px;overflow:hidden;border-left:3px solid var(--mag-l);transition:box-shadow .15s;}
+.inf-card:hover{box-shadow:var(--sh-lg);}
+.inf-head{padding:13px 15px;display:flex;align-items:flex-start;gap:11px;cursor:pointer;transition:background .15s;}
+.inf-head:hover{background:#fbf7ff;}
+.inf-icon{width:40px;height:40px;border-radius:10px;background:var(--mag-l);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;}
+.inf-meta{flex:1;min-width:0;}
+.inf-sitio{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.inf-cod{font-size:11px;color:var(--mag);font-weight:600;margin-top:1px;word-break:break-all;}
+.inf-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.inf-badge{display:inline-block;background:var(--mag-l);color:var(--mag-d);font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-top:3px;}
+.inf-body{display:none;padding:0 15px 15px;border-top:1px solid #f1f5f9;}
+.inf-body.open{display:block;}
+.inf-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:13px;margin-top:13px;}
+.id-row{font-size:12px;padding:7px 10px;background:#f8fafc;border-radius:7px;}
+.id-lbl{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px;}
+.id-val{font-weight:600;color:var(--text);margin-top:1px;word-break:break-all;}
+.inf-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.act-btn{flex:1;min-width:80px;padding:10px 8px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:5px;transition:.15s;}
+.act-btn:active{opacity:.8;transform:scale(.97);}
+.act-dl{background:var(--mag);color:#fff;}
+.act-dl:hover{background:var(--mag-d);}
+.act-em{background:#f0fdf4;color:#15803d;}
+.act-em:hover{background:#dcfce7;}
+.act-del{background:#fef2f2;color:#dc2626;}
+.act-del:hover{background:#fee2e2;}
 
 /* ── MODAL ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px);}
@@ -475,33 +503,29 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 
 <!-- ══════════ PANEL 4: HISTORIAL ══════════ -->
 <div class="panel" id="panel-4">
-  <div class="hist-card">
-    <div class="hist-header">
-      <span class="hist-title">Informes Generados</span>
-      <span style="display:flex;align-items:center;gap:8px;">
-        <span class="hist-count" id="hist-count">Cargando...</span>
-        <button class="btn-dl" onclick="openReporteModal()">📊 Reporte</button>
-      </span>
-    </div>
-    <div id="hist-body"><div class="hist-empty">Cargando historial...</div></div>
+  <div class="hist-header" style="background:var(--white);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:12px;">
+    <span class="hist-title">Informes Generados</span>
+    <span style="display:flex;align-items:center;gap:8px;">
+      <span class="hist-count" id="hist-count">Cargando...</span>
+      <button class="btn-dl" onclick="openReporteModal()">📊 Reporte</button>
+    </span>
   </div>
+  <div id="hist-body"><div class="hist-empty">Cargando historial...</div></div>
   <div class="actions" style="margin-top:12px;">
     <button class="btn btn-secondary" onclick="goTab(0)">← Inicio</button>
   </div>
 </div>
 
 <div class="panel" id="panel-5">
-  <div class="hist-card">
-    <div class="hist-header">
-      <span class="hist-title">🗑 Papelera de reciclaje</span>
-      <span style="display:flex;align-items:center;gap:8px;">
-        <span class="hist-count" id="pap-count">Cargando...</span>
-        <button class="btn-del" onclick="vaciarPapeleraWom()">Vaciar papelera</button>
-      </span>
-    </div>
-    <div style="font-size:12px;color:#888;margin:-4px 4px 10px;">Los informes se borran definitivamente a los 30 días.</div>
-    <div id="pap-body"><div class="hist-empty">Cargando papelera...</div></div>
+  <div class="hist-header" style="background:var(--white);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:8px;">
+    <span class="hist-title">🗑 Papelera de reciclaje</span>
+    <span style="display:flex;align-items:center;gap:8px;">
+      <span class="hist-count" id="pap-count">Cargando...</span>
+      <button class="btn-del" onclick="vaciarPapeleraWom()">Vaciar papelera</button>
+    </span>
   </div>
+  <div style="font-size:12px;color:var(--muted);margin:0 4px 12px;">Los informes se borran definitivamente a los 30 días.</div>
+  <div id="pap-body"><div class="hist-empty">Cargando papelera...</div></div>
   <div class="actions" style="margin-top:12px;">
     <button class="btn btn-secondary" onclick="goTab(0)">← Inicio</button>
   </div>
@@ -951,6 +975,38 @@ async function generarInforme() {
 }
 
 // ── Historial ─────────────────────────────────────────────────
+function toggleInf(id){document.getElementById(`body_${id}`)?.classList.toggle('open');}
+
+function infCardWom(e, { idPrefix='', icon='📄', dateField='fechaCreacion', dateLabel='', actions='' } = {}) {
+  const fc = e[dateField] ? new Date(e[dateField]) : null;
+  const dateStr = fc ? fc.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+  const dateBox = dateLabel ? `${dateLabel}<br>${fc?fc.toLocaleDateString('es-CL'):'—'}` : dateStr.replace(',','<br>');
+  const photos = e.photoCount||0;
+  const tecs = (e.tecnicos||'').split(',').map(s=>s.trim()).filter(Boolean).join(' / ');
+  const uid = idPrefix + e.id;
+  return `<div class="inf-card">
+    <div class="inf-head" onclick="toggleInf('${uid}')">
+      <div class="inf-icon">${icon}</div>
+      <div class="inf-meta">
+        <div class="inf-sitio">${e.ticket||'—'}</div>
+        <div class="inf-cod">${e.codInterno?`INC-${e.codInterno}`:(e.instalacion||'—')}</div>
+        <div class="inf-sub">${e.tipoActividad||'—'} · ${e.instalacion||'—'}</div>
+        <span class="inf-badge">📷 ${photos} foto${photos!==1?'s':''}</span>
+      </div>
+      <div style="font-size:10px;color:var(--muted);text-align:right;flex-shrink:0">${dateBox}</div>
+    </div>
+    <div class="inf-body" id="body_${uid}">
+      <div class="inf-detail-grid">
+        <div class="id-row"><div class="id-lbl">Fecha Inicio</div><div class="id-val">${e.fechaInicio||'—'}</div></div>
+        <div class="id-row"><div class="id-lbl">Tipo Actividad</div><div class="id-val">${e.tipoActividad||'—'}</div></div>
+        <div class="id-row"><div class="id-lbl">Instalación</div><div class="id-val">${e.instalacion||'—'}</div></div>
+        <div class="id-row"><div class="id-lbl">Técnicos</div><div class="id-val">${tecs||'—'}</div></div>
+      </div>
+      <div class="inf-actions">${actions}</div>
+    </div>
+  </div>`;
+}
+
 async function loadHistorial() {
   const body = g('hist-body');
   if (!body) return;
@@ -958,23 +1014,12 @@ async function loadHistorial() {
   try {
     const data = await fetch('/registro-wom').then(r=>r.json());
     g('hist-count').textContent = `${data.length} informe(s)`;
-    if (!data.length) { body.innerHTML = '<div class="hist-empty">No hay informes generados aún.</div>'; return; }
-    body.innerHTML = data.map(e => `
-      <div class="hist-row">
-        <div class="hist-info">
-          <div class="hist-ticket">${e.ticket||'—'}</div>
-          <div class="hist-sub">
-            ${e.tipoActividad||''} · ${e.instalacion||''} · ${e.fechaInicio||''}
-            ${e.codInterno ? `<span class="hist-inc"> · INC-${e.codInterno}</span>` : ''}
-          </div>
-          <div class="hist-sub">${(e.tecnicos||'').split(',').join(' / ')} · ${e.photoCount||0} foto(s)</div>
-        </div>
-        <div class="hist-actions">
-          <button class="btn-dl" onclick="descargar('${e.id}')">↓ Descargar</button>
-          <button class="btn-del" onclick="eliminar('${e.id}',this)">🗑</button>
-        </div>
-      </div>`).join('');
-  } catch { body.innerHTML = '<div class="hist-empty">Error al cargar historial.</div>'; }
+    if (!data.length) { body.innerHTML = '<div class="hist-empty"><div class="ei">📂</div><p>No hay informes generados aún.</p></div>'; return; }
+    body.innerHTML = data.map(e => infCardWom(e, {
+      actions: `<button class="act-btn act-dl" onclick="descargar('${e.id}')">⬇ Descargar</button>
+                <button class="act-btn act-del" onclick="eliminar('${e.id}',this)">🗑️ Borrar</button>`
+    })).join('');
+  } catch { body.innerHTML = '<div class="hist-empty"><div class="ei">⚠️</div><p>Error al cargar historial.</p></div>'; }
 }
 
 // ── Reporte Excel ────────────────────────────────────────────────
@@ -1088,26 +1133,13 @@ async function loadPapeleraWom() {
   try {
     const data = await fetch('/papelera-wom').then(r=>r.json());
     g('pap-count').textContent = `${data.length} en papelera`;
-    if (!data.length) { body.innerHTML = '<div class="hist-empty">La papelera está vacía.</div>'; return; }
-    body.innerHTML = data.map(e => {
-      const fEl = e.deletedAt ? new Date(e.deletedAt).toLocaleDateString() : '';
-      return `
-      <div class="hist-row">
-        <div class="hist-info">
-          <div class="hist-ticket">${e.ticket||'—'}</div>
-          <div class="hist-sub">
-            ${e.tipoActividad||''} · ${e.instalacion||''} · ${e.fechaInicio||''}
-            ${e.codInterno ? `<span class="hist-inc"> · INC-${e.codInterno}</span>` : ''}
-          </div>
-          <div class="hist-sub">${(e.tecnicos||'').split(',').join(' / ')} · ${e.photoCount||0} foto(s)${fEl?` · eliminado ${fEl}`:''}</div>
-        </div>
-        <div class="hist-actions">
-          <button class="btn-dl" onclick="restaurarWom('${e.id}',this)">↩ Restaurar</button>
-          <button class="btn-del" onclick="eliminarDefWom('${e.id}',this)">🗑 Borrar</button>
-        </div>
-      </div>`;
-    }).join('');
-  } catch { body.innerHTML = '<div class="hist-empty">Error al cargar la papelera.</div>'; }
+    if (!data.length) { body.innerHTML = '<div class="hist-empty"><div class="ei">🗑️</div><p>La papelera está vacía.</p></div>'; return; }
+    body.innerHTML = data.map(e => infCardWom(e, {
+      idPrefix: 'pap_', icon: '🗑️', dateField: 'deletedAt', dateLabel: 'eliminado',
+      actions: `<button class="act-btn act-dl" onclick="restaurarWom('${e.id}',this)">↩ Restaurar</button>
+                <button class="act-btn act-del" onclick="eliminarDefWom('${e.id}',this)">🗑️ Borrar</button>`
+    })).join('');
+  } catch { body.innerHTML = '<div class="hist-empty"><div class="ei">⚠️</div><p>Error al cargar la papelera.</p></div>'; }
 }
 
 async function restaurarWom(id, btn) {
