@@ -676,6 +676,9 @@ async function buildDocx(d) {
 // ── Auto-envío de informes por correo ──────────────────────────
 // Configurable por variables de entorno (Render). Si faltan MAIL_USER/MAIL_PASS
 // el auto-envío queda desactivado y el sistema sigue funcionando normalmente.
+// Outlook personal:  MAIL_HOST=smtp-mail.outlook.com  MAIL_PORT=587
+// Microsoft 365:     MAIL_HOST=smtp.office365.com      MAIL_PORT=587
+// Gmail (def.):      MAIL_HOST=smtp.gmail.com          MAIL_PORT=587
 const MAIL_HOST = process.env.MAIL_HOST || 'smtp.gmail.com';
 const MAIL_PORT = parseInt(process.env.MAIL_PORT || '587', 10);
 const MAIL_TO   = process.env.MAIL_TO || process.env.MAIL_USER || '';
@@ -684,8 +687,11 @@ let mailTransport = null;
 function getMailTransport() {
   if (!process.env.MAIL_USER || !process.env.MAIL_PASS) return null;
   if (!mailTransport) {
+    const secure = MAIL_PORT === 465;
     mailTransport = nodemailer.createTransport({
-      host: MAIL_HOST, port: MAIL_PORT, secure: MAIL_PORT === 465,
+      host: MAIL_HOST, port: MAIL_PORT, secure,
+      // En 587 (Outlook/Gmail) forzar STARTTLS: Outlook rechaza la conexión sin esto.
+      ...(secure ? {} : { requireTLS: true, tls: { ciphers: 'TLSv1.2' } }),
       auth: { user: process.env.MAIL_USER, pass: process.env.MAIL_PASS }
     });
   }
