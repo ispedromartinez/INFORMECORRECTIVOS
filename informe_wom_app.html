@@ -151,8 +151,61 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 .modal-title{font-size:15px;font-weight:700;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;}
 .modal-close{background:#f1f5f9;border:none;font-size:16px;cursor:pointer;color:var(--muted);width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
 .modal-info{font-size:12px;color:var(--muted);margin-bottom:14px;padding:9px 13px;background:#f8fafc;border-radius:8px;}
-.rep-tab{flex:1;text-align:center;padding:7px 4px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;color:var(--muted);}
+.rep-tab{flex:1;text-align:center;padding:8px 4px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;color:var(--muted);transition:color .15s ease,background .15s ease,box-shadow .15s ease,transform .12s ease;}
+@media (hover:hover) and (pointer:fine){.rep-tab:hover{color:var(--mag);}}
 .rep-tab.active{background:#fff;color:var(--mag);box-shadow:0 1px 3px rgba(0,0,0,.12);}
+.rep-tab:active{transform:scale(.95);}
+
+/* ── REPORTE MODAL (rediseño, igual a Tigo) ── */
+.modal-overlay.centered{align-items:center;padding:20px;}
+.modal-overlay.centered .modal-box{border-radius:20px;animation:modalPop .22s cubic-bezier(.16,1,.3,1);}
+@keyframes modalPop{from{opacity:0;transform:scale(.94) translateY(8px);}to{opacity:1;transform:none;}}
+@keyframes repFieldIn{to{opacity:1;transform:none;}}
+.rep-modal{padding:20px 20px 22px;}
+.rep-header{display:flex;align-items:center;gap:13px;margin-bottom:18px;}
+.rep-header-ico{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--mag),var(--mag-d));color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 5px 16px rgba(120,75,209,.4);}
+.rep-header-txt{flex:1;min-width:0;}
+.rep-header-title{font-size:17px;font-weight:700;color:var(--text);letter-spacing:-.3px;line-height:1.2;}
+.rep-header-sub{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.3;}
+.rep-modal .modal-close{align-self:flex-start;transition:background .15s,color .15s;}
+.rep-modal .modal-close:hover{background:#e2e8f0;color:var(--text);}
+.rep-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:11px;}
+.rep-toolbar .card-title{margin:0;padding:0;border:none;}
+.rep-toolbar .card-title::before{display:none;}
+.rep-sel{display:flex;gap:6px;}
+.rep-mini{font-size:11px;font-weight:600;color:var(--mag-d);background:var(--mag-l);border:none;padding:5px 10px;border-radius:7px;cursor:pointer;transition:background .15s ease,transform .12s ease;}
+.rep-mini:hover{background:#e0d5f5;}
+.rep-mini:active{transform:scale(.94);}
+.rep-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.rep-fields .rep-field{opacity:0;transform:translateY(6px);animation:repFieldIn .32s ease forwards;}
+.rep-fields .rep-field:nth-child(1){animation-delay:.02s;}
+.rep-fields .rep-field:nth-child(2){animation-delay:.06s;}
+.rep-fields .rep-field:nth-child(3){animation-delay:.10s;}
+.rep-fields .rep-field:nth-child(4){animation-delay:.14s;}
+.rep-fields .rep-field:nth-child(5){animation-delay:.18s;}
+.rep-fields .rep-field:nth-child(6){animation-delay:.22s;}
+.rep-fields .rep-field:nth-child(7){animation-delay:.26s;}
+.rep-field{position:relative;display:flex;align-items:center;gap:9px;padding:10px 12px;border:1.5px solid var(--border);border-radius:11px;cursor:pointer;font-size:12.5px;color:var(--text);background:#fff;transition:.15s;user-select:none;}
+.rep-field:hover{border-color:var(--mag-b);}
+.rep-field.on{border-color:var(--mag);background:var(--mag-l);}
+.rep-field:active{transform:scale(.98);}
+.rep-field input{position:absolute;opacity:0;pointer-events:none;width:0;height:0;}
+.rep-field .ic{width:16px;height:16px;flex-shrink:0;color:var(--muted);}
+.rep-field.on .ic{color:var(--mag);}
+.rep-field .lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rep-field .rep-check{width:16px;height:16px;border-radius:5px;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s;}
+.rep-field.on .rep-check{background:var(--mag);border-color:var(--mag);}
+.rep-field .rep-check svg{width:10px;height:10px;color:#fff;opacity:0;transition:.15s;}
+.rep-field.on .rep-check svg{opacity:1;}
+.btn-gen{width:100%;background:var(--mag);color:#fff;border:none;border-radius:var(--r);padding:14px;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 20px rgba(120,75,209,.35);transition:background .2s ease,box-shadow .2s ease,transform .14s ease;letter-spacing:.2px;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;}
+@media (hover:hover) and (pointer:fine){.btn-gen:hover{background:var(--mag-d);box-shadow:0 6px 24px rgba(120,75,209,.45);transform:translateY(-1px);}}
+.btn-gen:disabled{background:#a99cc7;box-shadow:none;cursor:not-allowed;transform:none;}
+.btn-gen:active{transform:scale(.97);}
+@media (prefers-reduced-motion:reduce){
+  .rep-fields .rep-field{animation:none;opacity:1;transform:none;}
+  .modal-overlay.centered .modal-box{animation:none;}
+  .rep-tab:active,.rep-mini:active,.rep-field:active,.btn-gen:active{transform:none;}
+}
 
 /* ── TOAST ── */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:#1e293b;color:#fff;padding:12px 22px;border-radius:50px;font-size:13px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.25);transition:transform .3s ease;z-index:9999;pointer-events:none;white-space:nowrap;}
@@ -191,6 +244,7 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
     <div class="tab locked" data-tab="2"><span class="num">2</span>Trabajos</div>
     <div class="tab locked" data-tab="3"><span class="num">3</span>Resumen y Fotos</div>
     <div class="tab" data-tab="4"><span class="num num-win"><svg width="9" height="9" viewBox="0 0 9 9" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x=".5" y=".5" width="8" height="8" rx=".5" stroke="currentColor" stroke-width="1.2"/><line x1=".5" y1="3" x2="8.5" y2="3" stroke="currentColor" stroke-width="1.2"/><circle cx="2" cy="1.8" r=".6" fill="currentColor"/><circle cx="3.8" cy="1.8" r=".6" fill="currentColor"/></svg></span>Historial</div>
+    <div class="tab" data-tab="5"><span class="num">🗑</span>Papelera</div>
   </div>
 </nav>
 
@@ -436,10 +490,34 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
   </div>
 </div>
 
+<div class="panel" id="panel-5">
+  <div class="hist-card">
+    <div class="hist-header">
+      <span class="hist-title">🗑 Papelera de reciclaje</span>
+      <span style="display:flex;align-items:center;gap:8px;">
+        <span class="hist-count" id="pap-count">Cargando...</span>
+        <button class="btn-del" onclick="vaciarPapeleraWom()">Vaciar papelera</button>
+      </span>
+    </div>
+    <div style="font-size:12px;color:#888;margin:-4px 4px 10px;">Los informes se borran definitivamente a los 30 días.</div>
+    <div id="pap-body"><div class="hist-empty">Cargando papelera...</div></div>
+  </div>
+  <div class="actions" style="margin-top:12px;">
+    <button class="btn btn-secondary" onclick="goTab(0)">← Inicio</button>
+  </div>
+</div>
+
 <!-- REPORTE MODAL -->
-<div class="modal-overlay" id="reporteModal">
-  <div class="modal-box" style="max-width:480px;max-height:85vh;overflow-y:auto;">
-    <div class="modal-title">📊 Generar reporte Excel<button class="modal-close" onclick="closeReporteModal()">✕</button></div>
+<div class="modal-overlay centered" id="reporteModal">
+  <div class="modal-box rep-modal" style="max-width:460px;max-height:88vh;overflow-y:auto;">
+    <div class="rep-header">
+      <div class="rep-header-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="8"/><rect x="13" y="6" width="3" height="12"/></svg></div>
+      <div class="rep-header-txt">
+        <div class="rep-header-title">Generar reporte</div>
+        <div class="rep-header-sub">Exporta los informes a un archivo Excel</div>
+      </div>
+      <button class="modal-close" onclick="closeReporteModal()">✕</button>
+    </div>
     <div class="card" style="margin-bottom:14px;">
       <div class="card-title">Periodo</div>
       <div style="display:flex;gap:4px;background:#EDEEF2;border-radius:10px;padding:4px;margin-bottom:10px;">
@@ -458,10 +536,16 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
       </div>
     </div>
     <div class="card" style="margin-bottom:14px;">
-      <div class="card-title">Columnas</div>
-      <div id="reporteColumnas" style="display:flex;flex-direction:column;gap:9px;"></div>
+      <div class="rep-toolbar">
+        <div class="card-title">Selecciona campos</div>
+        <div class="rep-sel">
+          <button class="rep-mini" onclick="setAllReporteCols(true)">Todos</button>
+          <button class="rep-mini" onclick="setAllReporteCols(false)">Ninguno</button>
+        </div>
+      </div>
+      <div id="reporteColumnas" class="rep-fields"></div>
     </div>
-    <button class="btn-primary btn" id="btnGenerarReporte" style="width:100%;justify-content:center;" onclick="generarReporte()">📥 Generar Excel</button>
+    <button class="btn-gen" id="btnGenerarReporte" onclick="generarReporte()"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Generar Excel</button>
   </div>
 </div>
 
@@ -504,6 +588,7 @@ function goTab(n) {
   });
   document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === n));
   if (n === 4) loadHistorial();
+  if (n === 5) loadPapeleraWom();
   updateEstadoActual();
   window.scrollTo({top: 0, behavior:'smooth'});
 }
@@ -893,11 +978,20 @@ async function loadHistorial() {
 }
 
 // ── Reporte Excel ────────────────────────────────────────────────
+const REP_ICONS={
+  cal:'<path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/>',
+  file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/>',
+  tag:'<path d="M20.59 13.41 13.42 20.6a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1"/>',
+  pin:'<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>',
+  user:'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  cog:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  cam:'<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>'
+};
 const REPORTE_COLUMNAS_WOM=[
-  {key:'fechaInicio',label:'Fecha Inicio'},{key:'ticket',label:'Ticket'},
-  {key:'codInterno',label:'Código Interno'},{key:'instalacion',label:'Instalación'},
-  {key:'tipoActividad',label:'Tipo Actividad'},{key:'tecnicos',label:'Técnicos'},
-  {key:'photoCount',label:'Cant. Fotos'}
+  {key:'fechaInicio',label:'Fecha Inicio',ic:'cal'},{key:'ticket',label:'Ticket',ic:'file'},
+  {key:'codInterno',label:'Código Interno',ic:'tag'},{key:'instalacion',label:'Instalación',ic:'pin'},
+  {key:'tipoActividad',label:'Tipo Actividad',ic:'cog'},{key:'tecnicos',label:'Técnicos',ic:'user'},
+  {key:'photoCount',label:'Cant. Fotos',ic:'cam'}
 ];
 let periodoTipoActivo='todos';
 function selectPeriodoTipo(tipo){
@@ -935,10 +1029,16 @@ function openReporteModal(){
   document.getElementById('repDesde').value='';
   document.getElementById('repHasta').value='';
   const colsDiv=document.getElementById('reporteColumnas');
-  colsDiv.innerHTML=REPORTE_COLUMNAS_WOM.map(c=>`<label style="display:flex;align-items:center;gap:7px;font-size:13px;"><input type="checkbox" class="reporte-col" value="${c.key}" checked>${c.label}</label>`).join('');
+  const svg=p=>`<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+  const check='<span class="rep-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>';
+  colsDiv.innerHTML=REPORTE_COLUMNAS_WOM.map(c=>`<label class="rep-field on">${svg(REP_ICONS[c.ic])}<input type="checkbox" class="reporte-col" value="${c.key}" checked onchange="this.closest('.rep-field').classList.toggle('on',this.checked)"><span class="lbl">${c.label}</span>${check}</label>`).join('');
   colsDiv.onchange=updateReporteBtnState;
   updateReporteBtnState();
   document.getElementById('reporteModal').classList.add('open');
+}
+function setAllReporteCols(on){
+  document.querySelectorAll('#reporteColumnas .reporte-col').forEach(cb=>{cb.checked=on;cb.closest('.rep-field').classList.toggle('on',on);});
+  updateReporteBtnState();
 }
 function closeReporteModal(){document.getElementById('reporteModal').classList.remove('open');}
 async function generarReporte(){
@@ -978,6 +1078,79 @@ async function eliminar(id, btn) {
     toast('Informe movido a papelera');
     loadHistorial();
   } catch { toast('Error al eliminar','err'); btn.disabled = false; }
+}
+
+// ── Papelera de reciclaje ────────────────────────────────────
+async function loadPapeleraWom() {
+  const body = g('pap-body');
+  if (!body) return;
+  body.innerHTML = '<div class="hist-empty">Cargando...</div>';
+  try {
+    const data = await fetch('/papelera-wom').then(r=>r.json());
+    g('pap-count').textContent = `${data.length} en papelera`;
+    if (!data.length) { body.innerHTML = '<div class="hist-empty">La papelera está vacía.</div>'; return; }
+    body.innerHTML = data.map(e => {
+      const fEl = e.deletedAt ? new Date(e.deletedAt).toLocaleDateString() : '';
+      return `
+      <div class="hist-row">
+        <div class="hist-info">
+          <div class="hist-ticket">${e.ticket||'—'}</div>
+          <div class="hist-sub">
+            ${e.tipoActividad||''} · ${e.instalacion||''} · ${e.fechaInicio||''}
+            ${e.codInterno ? `<span class="hist-inc"> · INC-${e.codInterno}</span>` : ''}
+          </div>
+          <div class="hist-sub">${(e.tecnicos||'').split(',').join(' / ')} · ${e.photoCount||0} foto(s)${fEl?` · eliminado ${fEl}`:''}</div>
+        </div>
+        <div class="hist-actions">
+          <button class="btn-dl" onclick="restaurarWom('${e.id}',this)">↩ Restaurar</button>
+          <button class="btn-del" onclick="eliminarDefWom('${e.id}',this)">🗑 Borrar</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch { body.innerHTML = '<div class="hist-empty">Error al cargar la papelera.</div>'; }
+}
+
+async function restaurarWom(id, btn) {
+  btn.disabled = true;
+  try {
+    const resp = await fetch(`/papelera-wom/restaurar/${id}`, { method:'POST' });
+    if (!resp.ok) {
+      let msg = 'Error ' + resp.status;
+      try { const t = await resp.text(); try { const j = JSON.parse(t); if (j && j.error) msg = j.error; } catch { if (t) msg = t.slice(0,300); } } catch {}
+      toast('No se pudo restaurar: ' + msg, 'err'); btn.disabled = false; return;
+    }
+    toast('Informe restaurado al historial','ok');
+    loadPapeleraWom();
+  } catch { toast('Error al restaurar','err'); btn.disabled = false; }
+}
+
+async function eliminarDefWom(id, btn) {
+  if (!confirm('¿Eliminar este informe DEFINITIVAMENTE? Esta acción no se puede deshacer.')) return;
+  btn.disabled = true;
+  try {
+    const resp = await fetch(`/papelera-wom/${id}`, { method:'DELETE' });
+    if (!resp.ok) {
+      let msg = 'Error ' + resp.status;
+      try { const t = await resp.text(); try { const j = JSON.parse(t); if (j && j.error) msg = j.error; } catch { if (t) msg = t.slice(0,300); } } catch {}
+      toast('No se pudo borrar definitivamente: ' + msg, 'err'); btn.disabled = false; return;
+    }
+    toast('Informe eliminado definitivamente','ok');
+    loadPapeleraWom();
+  } catch { toast('Error al borrar','err'); btn.disabled = false; }
+}
+
+async function vaciarPapeleraWom() {
+  if (!confirm('¿Vaciar toda la papelera? Se eliminarán definitivamente todos los informes que contiene.')) return;
+  try {
+    const resp = await fetch('/papelera-wom', { method:'DELETE' });
+    if (!resp.ok) {
+      let msg = 'Error ' + resp.status;
+      try { const t = await resp.text(); try { const j = JSON.parse(t); if (j && j.error) msg = j.error; } catch { if (t) msg = t.slice(0,300); } } catch {}
+      toast('No se pudo vaciar la papelera: ' + msg, 'err'); return;
+    }
+    toast('Papelera vaciada','ok');
+    loadPapeleraWom();
+  } catch { toast('Error al vaciar','err'); }
 }
 
 // ── Draft persistence (localStorage) ─────────────────────────
