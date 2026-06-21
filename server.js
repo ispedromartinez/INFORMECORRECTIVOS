@@ -35,15 +35,22 @@ const allowedOrigins = [
   `http://127.0.0.1:${PORT_FOR_CORS}`,
   'null', // file:// (HTML abierto directo con doble clic, ver LEEME.txt)
   ...(process.env.ALLOWED_ORIGIN ? [process.env.ALLOWED_ORIGIN] : []),
+  // En Render el propio dominio se expone aquí: permite el same-origin del deploy
+  ...(process.env.RENDER_EXTERNAL_URL ? [process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '')] : []),
 ];
 const lanOriginPattern = new RegExp(`^http://192\\.168\\.\\d{1,3}\\.\\d{1,3}:${PORT_FOR_CORS}$`);
+// Cualquier subdominio https de Render (el sitio llamándose a sí mismo)
+const renderOriginPattern = /^https:\/\/[a-z0-9-]+\.onrender\.com$/i;
 
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || lanOriginPattern.test(origin)) {
+    if (!origin || allowedOrigins.includes(origin)
+        || lanOriginPattern.test(origin) || renderOriginPattern.test(origin)) {
       return callback(null, true);
     }
-    callback(new Error('Origen no permitido por CORS: ' + origin));
+    // Rechazo limpio (sin cabeceras CORS) en vez de lanzar un Error,
+    // que Express convertiría en un 500 "Internal Server Error".
+    callback(null, false);
   },
 }));
 const generalLimiter = rateLimit({
