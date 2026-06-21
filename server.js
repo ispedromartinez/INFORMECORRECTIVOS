@@ -679,9 +679,21 @@ async function buildDocx(d) {
 // Outlook personal:  MAIL_HOST=smtp-mail.outlook.com  MAIL_PORT=587
 // Microsoft 365:     MAIL_HOST=smtp.office365.com      MAIL_PORT=587
 // Gmail (def.):      MAIL_HOST=smtp.gmail.com          MAIL_PORT=587
+// Brevo (Sendinblue):MAIL_HOST=smtp-relay.brevo.com    MAIL_PORT=587
+//   MAIL_USER = login SMTP de Brevo (p.ej. 8xxxxx@smtp-brevo.com)
+//   MAIL_PASS = clave SMTP de Brevo (NO la contraseña de la cuenta)
+//   MAIL_FROM = remitente verificado en Brevo (Brevo rechaza enviar desde MAIL_USER)
 const MAIL_HOST = process.env.MAIL_HOST || 'smtp.gmail.com';
 const MAIL_PORT = parseInt(process.env.MAIL_PORT || '587', 10);
 const MAIL_TO   = process.env.MAIL_TO || process.env.MAIL_USER || '';
+// Remitente del correo. En Gmail/Outlook coincide con el login; en Brevo debe ser
+// una dirección verificada distinta del login SMTP.
+const MAIL_FROM = process.env.MAIL_FROM || process.env.MAIL_USER || '';
+
+// API HTTP de Brevo. Render gratis BLOQUEA los puertos SMTP salientes (25/465/587),
+// así que en producción el envío debe ir por la API (HTTPS, puerto 443).
+// Si BREVO_API_KEY está definida, se usa la API; si no, se usa SMTP (nodemailer).
+const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
 
 let mailTransport = null;
 function getMailTransport() {
@@ -700,17 +712,54 @@ function getMailTransport() {
   return mailTransport;
 }
 
+// ¿Hay alguna vía de correo configurada?
+function mailConfigured() {
+  return !!BREVO_API_KEY || (!!process.env.MAIL_USER && !!process.env.MAIL_PASS);
+}
+
+// Envío vía API HTTP de Brevo (no usa SMTP, funciona en Render gratis).
+async function sendViaBrevoApi({ from, to, subject, text, filename, buffer }) {
+  const body = {
+    sender: { email: from },
+    to: [{ email: to }],
+    subject,
+    textContent: text
+  };
+  if (buffer && filename) {
+    body.attachment = [{ name: filename, content: Buffer.from(buffer).toString('base64') }];
+  }
+  const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: { 'accept': 'application/json', 'content-type': 'application/json', 'api-key': BREVO_API_KEY },
+    body: JSON.stringify(body)
+  });
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => '');
+    throw new Error(`Brevo API ${resp.status}: ${detail}`);
+  }
+}
+
+// Envío unificado: usa la API de Brevo si hay BREVO_API_KEY, si no, SMTP.
+async function sendEmail({ to, subject, text, filename, buffer }) {
+  if (!MAIL_FROM) throw new Error('Falta MAIL_FROM (remitente verificado).');
+  if (BREVO_API_KEY) {
+    return sendViaBrevoApi({ from: MAIL_FROM, to, subject, text, filename, buffer });
+  }
+  const transport = getMailTransport();
+  if (!transport) throw new Error('Sin configuración de correo: define BREVO_API_KEY o MAIL_USER/MAIL_PASS.');
+  await transport.sendMail({
+    from: MAIL_FROM, to, subject, text,
+    attachments: (buffer && filename) ? [{ filename, content: buffer }] : []
+  });
+}
+
 // Envía el informe recién creado al correo configurado. No bloquea ni lanza:
 // si falla, solo registra el error para no afectar la descarga del usuario.
 async function autoEnviarInforme({ buffer, filename, subject, text }) {
-  const transport = getMailTransport();
-  if (!transport) { console.warn('✉️  Auto-envío desactivado: falta MAIL_USER o MAIL_PASS'); return; }
-  if (!MAIL_TO)   { console.warn('✉️  Auto-envío desactivado: falta MAIL_TO'); return; }
+  if (!mailConfigured()) { console.warn('✉️  Auto-envío desactivado: falta BREVO_API_KEY o MAIL_USER/MAIL_PASS'); return; }
+  if (!MAIL_TO)          { console.warn('✉️  Auto-envío desactivado: falta MAIL_TO'); return; }
   try {
-    await transport.sendMail({
-      from: process.env.MAIL_USER, to: MAIL_TO, subject, text,
-      attachments: [{ filename, content: buffer }]
-    });
+    await sendEmail({ to: MAIL_TO, subject, text, filename, buffer });
     console.log(`✉️  Informe enviado automáticamente a ${MAIL_TO}: ${filename}`);
   } catch (err) {
     console.error('✉️  Error en auto-envío de informe:', err.message);
@@ -723,22 +772,27 @@ app.get('/ping', (req,res) => res.json({ok:true}));
 // Prueba de configuración de correo: envía un email de test a MAIL_TO.
 // Uso: abrir /probar-correo en el navegador. Devuelve el resultado real.
 app.get('/probar-correo', async (req, res) => {
-  const transport = getMailTransport();
-  if (!transport) {
-    return res.json({ ok: false, error: 'Auto-envío desactivado: falta MAIL_USER o MAIL_PASS en las variables de entorno.' });
+  const via = BREVO_API_KEY ? 'API Brevo (HTTPS)' : `SMTP ${MAIL_HOST}:${MAIL_PORT}`;
+  if (!mailConfigured()) {
+    return res.json({ ok: false, error: 'Correo desactivado: define BREVO_API_KEY (recomendado en Render) o MAIL_USER/MAIL_PASS.' });
+  }
+  if (!MAIL_FROM) {
+    return res.json({ ok: false, error: 'Falta MAIL_FROM (remitente verificado en Brevo).' });
   }
   if (!MAIL_TO) {
-    return res.json({ ok: false, error: 'Falta MAIL_TO (y MAIL_USER) para saber a quién enviar.' });
+    return res.json({ ok: false, error: 'Falta MAIL_TO para saber a quién enviar.' });
   }
   try {
-    await transport.sendMail({
-      from: process.env.MAIL_USER, to: MAIL_TO,
+    await sendEmail({
+      to: MAIL_TO,
       subject: '✅ Prueba de correo - Informes ICETEL',
-      text: `Este es un correo de prueba.\n\nSi lo recibiste, el auto-envío de informes está configurado correctamente.\n\nServidor SMTP: ${MAIL_HOST}:${MAIL_PORT}\nRemitente: ${process.env.MAIL_USER}\nDestino: ${MAIL_TO}\nFecha: ${new Date().toLocaleString()}`
+      text: `Este es un correo de prueba.\n\nSi lo recibiste, el auto-envío de informes está configurado correctamente.\n\nVía: ${via}\nRemitente: ${MAIL_FROM}\nDestino: ${MAIL_TO}\nFecha: ${new Date().toLocaleString()}`
     });
-    res.json({ ok: true, mensaje: `Correo de prueba enviado correctamente a ${MAIL_TO}. Revisa tu bandeja (y spam).`, host: MAIL_HOST, port: MAIL_PORT });
+    res.json({ ok: true, mensaje: `Correo de prueba enviado correctamente a ${MAIL_TO}. Revisa tu bandeja (y spam).`, via });
   } catch (err) {
-    res.json({ ok: false, error: err.message, host: MAIL_HOST, port: MAIL_PORT, sugerencia: 'Verifica MAIL_USER, que MAIL_PASS sea una contraseña de aplicación, y MAIL_HOST/MAIL_PORT.' });
+    res.json({ ok: false, error: err.message, via, sugerencia: BREVO_API_KEY
+      ? 'Verifica que BREVO_API_KEY sea válida y que MAIL_FROM sea un remitente verificado en Brevo.'
+      : 'Render gratis bloquea SMTP (587): usa BREVO_API_KEY en su lugar. En local, verifica MAIL_USER/MAIL_PASS.' });
   }
 });
 
