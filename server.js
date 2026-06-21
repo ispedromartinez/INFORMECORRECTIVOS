@@ -692,6 +692,8 @@ function getMailTransport() {
       host: MAIL_HOST, port: MAIL_PORT, secure,
       // En 587 (Outlook/Gmail) forzar STARTTLS: Outlook rechaza la conexión sin esto.
       ...(secure ? {} : { requireTLS: true, tls: { ciphers: 'TLSv1.2' } }),
+      // Fallar rápido si el host SMTP no responde (evita colgar el servidor → 502).
+      connectionTimeout: 12000, greetingTimeout: 12000, socketTimeout: 15000,
       auth: { user: process.env.MAIL_USER, pass: process.env.MAIL_PASS }
     });
   }
