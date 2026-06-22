@@ -16,6 +16,14 @@ const supabase = (process.env.SUPABASE_URL && process.env.SUPABASE_KEY)
   : null;
 const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || 'documentos-word';
 
+function sanitizeFnamePart(s, max = 20) {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, max);
+}
+function initialsFnamePart(name) {
+  return (name || '').trim().split(/\s+/).map(w => w[0] || '').join('').toUpperCase();
+}
+
 if (supabase) {
   supabase.from('informes_clima').select('id').limit(1)
     .then(({ error }) => {
@@ -834,8 +842,16 @@ app.post('/generar', heavyLimiter, async (req,res) => {
   try {
     const d = req.body;
     const buffer = await buildDocx(d);
-    const sitePart = (d.nombreSitio||'Clima').replace(/[^a-zA-Z0-9]/g,'_').slice(0,25);
-    const fname = `${d.codInforme||'Informe'}_${sitePart}.docx`;
+    const fechaPart = (d.fecha || '').split(' - ')[0].trim();
+    const fnameParts = [
+      sanitizeFnamePart(d.nombreSitio) || 'Sitio',
+      initialsFnamePart(d.tecnico) || 'TEC',
+      d.equipo ? `E${sanitizeFnamePart(d.equipo, 8)}` : '',
+      d.circuito ? `C${sanitizeFnamePart(d.circuito, 8)}` : '',
+      sanitizeFnamePart(d.sala, 20),
+      sanitizeFnamePart(fechaPart, 10)
+    ].filter(Boolean);
+    const fname = `${fnameParts.join('_')}.docx`;
     fs.writeFileSync(path.join(DOCS_DIR, fname), buffer);
     await storageUpload(buffer, `clima/${fname}`);
 
