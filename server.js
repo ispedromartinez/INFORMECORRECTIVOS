@@ -955,13 +955,12 @@ app.post('/enviar/:id', heavyLimiter, async (req,res) => {
     if (!fs.existsSync(fpath)) return res.status(404).json({error:'Archivo no existe'});
     buffer = fs.readFileSync(fpath);
   }
-  const {to,smtpHost,smtpPort,smtpUser,smtpPass} = req.body;
+  const { to } = req.body;
   if (!to) return res.status(400).json({error:'Email requerido'});
   try {
-    const t = nodemailer.createTransport({ host:smtpHost||'smtp.gmail.com', port:smtpPort||587, secure:false, auth:{user:smtpUser,pass:smtpPass} });
-    await t.sendMail({ from:smtpUser, to, subject:`Informe - ${entry.nombreSitio} - ${entry.codInforme}`,
+    await sendEmail({ to, subject:`Informe - ${entry.nombreSitio} - ${entry.codInforme}`,
       text:`Adjunto informe.\nSitio: ${entry.nombreSitio}\nFecha: ${entry.fecha}\nTécnico: ${entry.tecnico}`,
-      attachments:[{filename:entry.filename, content:buffer}] });
+      filename: entry.filename, buffer });
     res.json({ok:true});
   } catch(err){ res.status(500).json({error:err.message}); }
 });
