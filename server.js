@@ -1546,7 +1546,8 @@ app.post('/generar-wom', heavyLimiter, async (req, res) => {
 
     res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition',`attachment; filename="${fname}"`);
-    res.setHeader('Access-Control-Expose-Headers','Content-Disposition');
+    res.setHeader('X-Informe-Id', entry.id);
+    res.setHeader('Access-Control-Expose-Headers','Content-Disposition, X-Informe-Id');
     res.send(buffer);
   } catch(err) { console.error(err); res.status(500).json({error:err.message}); }
 });
@@ -1565,6 +1566,26 @@ app.get('/descargar-wom/:id', async (req, res) => {
   res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.wordprocessingml.document');
   res.setHeader('Content-Disposition',`attachment; filename="${entry.filename}"`);
   res.send(buffer);
+});
+
+app.get('/ver-pdf-wom/:id', async (req, res) => {
+  const entry = await dbWomFind(req.params.id);
+  if (!entry) return res.status(404).json({ error: 'No encontrado' });
+  const docxPath = path.join(DOCS_DIR_WOM, entry.filename);
+  if (!fs.existsSync(docxPath)) {
+    const buffer = await storageDownload(`wom/${entry.filename}`);
+    if (!buffer) return res.status(404).json({ error: 'Archivo no existe' });
+    fs.writeFileSync(docxPath, buffer);
+  }
+  try {
+    const pdfPath = await convertDocxToPdf(docxPath);
+    const pdfBuffer = fs.readFileSync(pdfPath);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${entry.filename.replace(/\.docx$/, '.pdf')}"`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.delete('/registro-wom/:id', async (req, res) => {
