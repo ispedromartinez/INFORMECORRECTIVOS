@@ -3,6 +3,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const fs = require('fs');
+const { execFile } = require('child_process');
 const path = require('path');
 const XLSXStyle = require('xlsx-js-style');
 const nodemailer = require('nodemailer');
@@ -85,13 +86,31 @@ app.get('/wom', (req, res) => res.sendFile(path.join(__dirname, 'informe_wom_app
 
 const DOCS_DIR      = path.join(__dirname, 'informes');
 const PAPELERA_DIR  = path.join(__dirname, 'papelera');
+const PDFS_DIR      = path.join(DOCS_DIR, 'pdf_tmp');
 const DB_FILE       = path.join(__dirname, 'registro.json');
 const PAPELERA_FILE = path.join(__dirname, 'papelera.json');
 
 if (!fs.existsSync(DOCS_DIR))     fs.mkdirSync(DOCS_DIR);
 if (!fs.existsSync(PAPELERA_DIR)) fs.mkdirSync(PAPELERA_DIR);
+if (!fs.existsSync(PDFS_DIR))     fs.mkdirSync(PDFS_DIR, { recursive: true });
 if (!fs.existsSync(DB_FILE))      fs.writeFileSync(DB_FILE, '[]');
 if (!fs.existsSync(PAPELERA_FILE))fs.writeFileSync(PAPELERA_FILE, '[]');
+
+function convertDocxToPdf(docxPath) {
+  return new Promise((resolve, reject) => {
+    const soffice = process.env.LIBREOFFICE_PATH || 'soffice';
+    execFile(soffice, ['--headless', '--convert-to', 'pdf', '--outdir', PDFS_DIR, docxPath], (err) => {
+      if (err) {
+        return reject(new Error('LibreOffice no instalado o no encontrado. Instala LibreOffice o configura LIBREOFFICE_PATH.'));
+      }
+      const pdfPath = path.join(PDFS_DIR, path.basename(docxPath, '.docx') + '.pdf');
+      if (!fs.existsSync(pdfPath)) {
+        return reject(new Error('LibreOffice no instalado o no encontrado. Instala LibreOffice o configura LIBREOFFICE_PATH.'));
+      }
+      resolve(pdfPath);
+    });
+  });
+}
 
 // ── Row mappers – Clima ────────────────────────────────────────
 const fromClima = r => ({
