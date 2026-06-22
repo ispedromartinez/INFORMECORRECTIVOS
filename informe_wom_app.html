@@ -499,6 +499,7 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
       Generar Informe WOM
     </button>
   </div>
+  <button class="btn btn-secondary" id="btn-ver-pdf-wom" onclick="verInformePdfWom()" style="display:none;width:100%;margin-top:8px">👁 Ver Informe (PDF)</button>
 </div>
 
 <!-- ══════════ PANEL 4: HISTORIAL ══════════ -->
@@ -752,6 +753,7 @@ function addTecnico(name='') {
 
 // ── Fotos ────────────────────────────────────────────────────
 let photos = [], captions = [], photoTransforms = [];
+let lastInformeIdWom = null;
 let activeDrag = null;
 
 function applyFotoTransform(i) {
@@ -964,6 +966,10 @@ async function generarInforme() {
     a.href = url; a.download = name; a.click();
     URL.revokeObjectURL(url);
 
+    lastInformeIdWom = resp.headers.get('X-Informe-Id');
+    const verBtn = g('btn-ver-pdf-wom');
+    if (verBtn) verBtn.style.display = lastInformeIdWom ? 'block' : 'none';
+
     toast(`✓ Informe "${name}" generado`, 'ok');
     clearState();
   } catch(err) {
@@ -972,6 +978,11 @@ async function generarInforme() {
     btn.disabled = false;
     btn.innerHTML = 'Generar Informe WOM';
   }
+}
+
+function verInformePdfWom() {
+  if (!lastInformeIdWom) return;
+  window.open(`/ver-pdf-wom/${lastInformeIdWom}`, '_blank');
 }
 
 // ── Historial ─────────────────────────────────────────────────
