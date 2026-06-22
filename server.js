@@ -690,7 +690,7 @@ async function buildDocx(d) {
       properties: {
         page: {
           size: { width: 12240, height: 15840 },
-          margin: { top: 1080, right: 1701, bottom: 1417, left: 1701, header: 284 }
+          margin: { top: 1080, right: 1186, bottom: 1417, left: 1185, header: 284 }
         }
       },
       children: sectionChildren

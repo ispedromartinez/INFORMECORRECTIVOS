@@ -263,6 +263,8 @@ input.has-error,textarea.has-error{border-color:#ef4444!important;background:#ff
 .act-em:hover{background:#dcfce7;}
 .act-del{background:#fef2f2;color:var(--red-tx);}
 .act-del:hover{background:#fee2e2;}
+.act-ver{background:#f1f5f9;color:var(--text);}
+.act-ver:hover{background:#e2e8f0;}
 
 /* ── SUMMARY ── */
 .summary-table{width:100%;border-collapse:collapse;font-size:13px;}
@@ -1837,6 +1839,7 @@ function renderHist(records){
           <div class="id-row"><div class="id-lbl">N° OT</div><div class="id-val">${r.numOT||'—'}</div></div>
         </div>
         <div class="inf-actions">
+          <button class="act-btn act-ver" onclick="verInformePdfRecord('${r.id}')">👁 Ver Informe</button>
           <button class="act-btn act-dl" onclick="downloadRecord('${r.id}')">⬇ Descargar</button>
           <button class="act-btn act-del" onclick="openConfirm('${r.id}','${(r.nombreSitio||'').replace(/'/g,"\\'")}')">🗑️ Borrar</button>
         </div>
@@ -1846,6 +1849,7 @@ function renderHist(records){
 }
 function toggleInf(id){document.getElementById(`body_${id}`).classList.toggle('open');}
 async function downloadRecord(id){const a=document.createElement('a');a.href=`${SERVER}/descargar/${id}`;a.click();}
+function verInformePdfRecord(id){window.open(`${SERVER}/ver-pdf/${id}`,'_blank');}
 function openConfirm(id,sitio){pendingDeleteId=id;document.getElementById('confirmMsg').textContent=`Se eliminará el informe de "${sitio}". Esta acción no se puede deshacer.`;document.getElementById('confirmDel').classList.add('open');}
 function closeConfirm(){document.getElementById('confirmDel').classList.remove('open');pendingDeleteId=null;}
 async function confirmDelete(){if(!pendingDeleteId)return;closeConfirm();try{await fetch(`${SERVER}/registro/${pendingDeleteId}`,{method:'DELETE'});await loadHist();}catch(e){alert('Error: '+e.message);}}

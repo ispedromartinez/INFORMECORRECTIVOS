@@ -171,6 +171,8 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 .act-em:hover{background:#dcfce7;}
 .act-del{background:#fef2f2;color:#dc2626;}
 .act-del:hover{background:#fee2e2;}
+.act-ver{background:#f1f5f9;color:var(--text);}
+.act-ver:hover{background:#e2e8f0;}
 
 /* ── MODAL ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px);}
@@ -1027,7 +1029,8 @@ async function loadHistorial() {
     g('hist-count').textContent = `${data.length} informe(s)`;
     if (!data.length) { body.innerHTML = '<div class="hist-empty"><div class="ei">📂</div><p>No hay informes generados aún.</p></div>'; return; }
     body.innerHTML = data.map(e => infCardWom(e, {
-      actions: `<button class="act-btn act-dl" onclick="descargar('${e.id}')">⬇ Descargar</button>
+      actions: `<button class="act-btn act-ver" onclick="verInformePdfRecord('${e.id}')">👁 Ver Informe</button>
+                <button class="act-btn act-dl" onclick="descargar('${e.id}')">⬇ Descargar</button>
                 <button class="act-btn act-del" onclick="eliminar('${e.id}',this)">🗑️ Borrar</button>`
     })).join('');
   } catch { body.innerHTML = '<div class="hist-empty"><div class="ei">⚠️</div><p>Error al cargar historial.</p></div>'; }
@@ -1117,6 +1120,10 @@ async function generarReporte(){
 
 async function descargar(id) {
   window.location.href = `/descargar-wom/${id}`;
+}
+
+function verInformePdfRecord(id) {
+  window.open(`/ver-pdf-wom/${id}`, '_blank');
 }
 
 async function eliminar(id, btn) {
