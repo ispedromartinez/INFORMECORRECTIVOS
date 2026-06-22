@@ -627,6 +627,7 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
   </div>
   <div style="padding:4px 0 20px">
     <button class="btn-gen" id="btnDocx" onclick="generateDocx()">⬇ Descargar Informe Word (.docx)</button>
+    <button class="btn btn-secondary" id="btnVerPdf" onclick="verInformePdf()" style="display:none;width:100%;margin-top:8px">👁 Ver Informe (PDF)</button>
     <div class="status" id="statusMsg"></div>
   </div>
 </div>
@@ -764,7 +765,7 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
 
 <script>
 const SERVER=window.location.origin;
-let serverOnline=false, allRecords=[], pendingDeleteId=null, pendingEmailId=null;
+let serverOnline=false, allRecords=[], pendingDeleteId=null, pendingEmailId=null, lastInformeId=null;
 
 // ══ SUPERVISORS list ══
 const SUPERVISORS=[
@@ -1331,6 +1332,8 @@ function nuevoInforme(){
   document.getElementById('fechaTermino').valueAsDate=new Date();
   previewCod();
   document.getElementById('statusMsg').style.display='none';
+  lastInformeId=null;
+  document.getElementById('btnVerPdf').style.display='none';
   document.querySelectorAll('.has-error').forEach(el=>el.classList.remove('has-error'));
   unlockedUpTo=1;
   updateTabStates();
@@ -1676,11 +1679,18 @@ async function generateDocx(){
     const fname=fnMatch?fnMatch[1]:`${cod}.docx`;
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');a.href=url;a.download=fname;a.click();URL.revokeObjectURL(url);
+    lastInformeId=resp.headers.get('X-Informe-Id');
+    document.getElementById('btnVerPdf').style.display=lastInformeId?'block':'none';
     status.className='status ok';status.textContent=`✅ "${fname}" generado y guardado en el historial`;
     setTimeout(()=>loadHist(true),800);
   }catch(err){
     status.className='status err';status.textContent='❌ '+err.message;
   }finally{btn.disabled=false;}
+}
+
+function verInformePdf(){
+  if(!lastInformeId)return;
+  window.open(`${SERVER}/ver-pdf/${lastInformeId}`,'_blank');
 }
 
 // ══ HISTORIAL ══
