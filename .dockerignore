@@ -1,0 +1,10 @@
+node_modules
+.git
+.claude
+informes
+papelera
+informes_wom
+papelera_wom
+server.log
+server_err.log
+docs
