@@ -1690,7 +1690,7 @@ async function generateDocx(){
     lastInformeId=resp.headers.get('X-Informe-Id');
     document.getElementById('btnVerPdf').style.display=lastInformeId?'block':'none';
     status.className='status ok';status.textContent=`✅ "${fname}" generado y guardado en el historial`;
-    setTimeout(()=>loadHist(true),800);
+    setTimeout(()=>showTab(7),800);
   }catch(err){
     status.className='status err';status.textContent='❌ '+err.message;
   }finally{btn.disabled=false;}

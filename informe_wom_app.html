@@ -978,6 +978,7 @@ async function generarInforme() {
 
     toast(`✓ Informe "${name}" generado`, 'ok');
     clearState();
+    goTab(4);
   } catch(err) {
     toast(`Error: ${err.message}`, 'err');
   } finally {
