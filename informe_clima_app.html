@@ -374,6 +374,64 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
 .cbtn.cancel:hover{background:#e2e8f0;}
 .cbtn.confirm{background:var(--red);color:#fff;}
 .cbtn.confirm:hover{background:#b91c1c;}
+.cbtn:disabled{opacity:.7;cursor:default;}
+.cspin{display:inline-block;width:15px;height:15px;border:2.5px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;animation:genSpin .7s linear infinite;vertical-align:-2px;}
+
+/* ── OVERLAY DE GENERACIÓN ── */
+.gen-overlay{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(20,22,45,.5);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
+.gen-overlay.open{display:flex;animation:genFade .25s ease;}
+@keyframes genFade{from{opacity:0}to{opacity:1}}
+.gen-card{--accent:var(--blue);--accent-soft:var(--bl);background:#fff;border-radius:22px;padding:34px 30px 30px;width:100%;max-width:320px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,.32);animation:genPop .42s var(--ease-out);}
+@keyframes genPop{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
+.gen-icon{position:relative;width:80px;height:80px;margin:0 auto 22px;display:flex;align-items:center;justify-content:center;}
+.gen-ring{position:absolute;inset:0;border-radius:50%;border:3px solid var(--accent-soft);border-top-color:var(--accent);animation:genSpin .8s linear infinite;transition:opacity .25s ease;}
+@keyframes genSpin{to{transform:rotate(360deg)}}
+.gen-doc{width:34px;height:34px;color:var(--accent);animation:genFloat 1.8s ease-in-out infinite;transition:opacity .25s ease,transform .3s var(--ease-out);}
+@keyframes genFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.gen-mark{position:absolute;width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;opacity:0;transform:scale(.5);transition:opacity .3s var(--ease-out),transform .42s var(--ease-out);}
+.gen-mark svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;}
+.gen-title{font-size:17px;font-weight:800;color:var(--text);margin-bottom:6px;letter-spacing:-.2px;}
+.gen-sub{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:20px;word-break:break-word;min-height:18px;}
+.gen-bar{height:6px;border-radius:99px;background:var(--accent-soft);overflow:hidden;position:relative;transition:opacity .3s ease;}
+.gen-bar-fill{position:absolute;top:0;height:100%;width:42%;border-radius:99px;background:var(--accent);animation:genSlide 1.15s var(--ease-out) infinite;}
+@keyframes genSlide{0%{left:-42%}100%{left:100%}}
+.gen-card.done .gen-ring,.gen-card.error .gen-ring,.gen-card.done .gen-bar,.gen-card.error .gen-bar{opacity:0;}
+.gen-card.done .gen-doc,.gen-card.error .gen-doc{opacity:0;transform:scale(.6);}
+.gen-card.done .gen-mark.ok{opacity:1;transform:scale(1);background:var(--green);}
+.gen-card.error .gen-mark.bad{opacity:1;transform:scale(1);background:var(--red);}
+
+/* ── TOAST ── */
+.tig-toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);background:#1C1F3B;color:#fff;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:1100;box-shadow:0 12px 32px rgba(0,0,0,.28);opacity:0;pointer-events:none;transition:opacity .25s var(--ease-out),transform .35s var(--ease-out);max-width:90vw;text-align:center;}
+.tig-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.tig-toast.ok{background:#0f7a3d;}
+.tig-toast.err{background:var(--red-tx);}
+
+/* ── Salida suave de tarjeta al borrar ── */
+.inf-card.removing{overflow:hidden;transition:height .32s var(--ease-out),opacity .25s ease,transform .32s var(--ease-out),margin .32s var(--ease-out);opacity:0;transform:translateX(-16px);}
+
+@media (prefers-reduced-motion:reduce){
+  .gen-card,.gen-doc,.gen-ring,.gen-bar-fill{animation-duration:.01ms!important;}
+}
+
+/* ── PULIDO DE INTERACCIONES ── */
+.section.active{animation:secIn .34s var(--ease-out);}
+@keyframes secIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.tab{transition:color .18s ease,background .2s var(--ease-out),box-shadow .2s var(--ease-out),transform .12s var(--ease-out);}
+.tab:not(.locked):active{transform:scale(.95);}
+.inf-card,.pap-card{transition:box-shadow .22s var(--ease-out),transform .22s var(--ease-out);}
+.act-btn,.act-restore,.act-perm,.btn-vaciar,.btn-refresh{transition:background .18s ease,color .18s ease,transform .12s var(--ease-out),box-shadow .2s var(--ease-out);}
+.act-restore:active,.act-perm:active,.btn-vaciar:active{transform:scale(.96);}
+.stat-box{transition:transform .25s var(--ease-out),box-shadow .25s var(--ease-out);}
+.cbtn{transition:background .15s ease,filter .15s ease,transform .12s var(--ease-out);}
+.cbtn:not(:disabled):active{transform:scale(.97);}
+@media (hover:hover) and (pointer:fine){
+  .inf-card:hover,.pap-card:hover{transform:translateY(-2px);}
+  .stat-box:hover{transform:translateY(-2px);box-shadow:var(--sh-lg);}
+}
+@media (prefers-reduced-motion:reduce){
+  .section.active{animation:none;}
+  .tab,.inf-card,.pap-card,.stat-box,.cbtn{transition:none;}
+}
 </style>
 </head>
 <body>
@@ -414,7 +472,7 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
 <div class="section active" id="tab0">
   <div class="nuevo-banner">
     <h2 style="display:flex;align-items:center;justify-content:center;gap:8px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>Nuevo Informe de Trabajo</h2>
-    <p>Inicia un informe de mantenimiento preventivo desde cero.<br>Todos los campos serán limpiados.</p>
+    <p>Inicia un informe correctivo desde cero.<br>Todos los campos serán limpiados.</p>
     <button class="btn-nuevo-start" onclick="nuevoInforme()">＋ Crear Nuevo Informe</button>
   </div>
   <div class="card">
@@ -770,6 +828,23 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
     </div>
   </div>
 </div>
+
+<!-- OVERLAY DE GENERACIÓN -->
+<div class="gen-overlay" id="genOverlay">
+  <div class="gen-card" id="genCard">
+    <div class="gen-icon">
+      <span class="gen-ring"></span>
+      <svg class="gen-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+      <span class="gen-mark ok"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+      <span class="gen-mark bad"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>
+    </div>
+    <div class="gen-title" id="genTitle">Generando informe</div>
+    <div class="gen-sub" id="genSub">Creando el documento Word…</div>
+    <div class="gen-bar"><div class="gen-bar-fill"></div></div>
+  </div>
+</div>
+
+<div id="tigToast" class="tig-toast"></div>
 
 <script>
 const SERVER=window.location.origin;
@@ -1654,8 +1729,7 @@ async function generateDocx(){
     return;
   }
   const btn=document.getElementById('btnDocx');
-  const status=document.getElementById('statusMsg');
-  btn.disabled=true;status.className='status loading';status.textContent='⏳ Generando código y documento...';
+  btn.disabled=true;genShow();
 
   // Get final correlative code
   const cod=await buildCodigoFinal()||'INFORME';
@@ -1688,17 +1762,53 @@ async function generateDocx(){
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');a.href=url;a.download=fname;a.click();URL.revokeObjectURL(url);
     lastInformeId=resp.headers.get('X-Informe-Id');
-    document.getElementById('btnVerPdf').style.display=lastInformeId?'block':'none';
-    status.className='status ok';status.textContent=`✅ "${fname}" generado y guardado en el historial`;
-    setTimeout(()=>showTab(7),800);
+    const _vp=document.getElementById('btnVerPdf'); if(_vp)_vp.style.display=lastInformeId?'block':'none';
+    genSuccess(fname);
+    setTimeout(()=>showTab(7),1100);
   }catch(err){
-    status.className='status err';status.textContent='❌ '+err.message;
+    genError(err.message);
   }finally{btn.disabled=false;}
 }
 
 function verInformePdf(){
   if(!lastInformeId)return;
   window.open(`${SERVER}/ver-pdf/${lastInformeId}`,'_blank');
+}
+
+// ══ OVERLAY DE GENERACIÓN ══
+function genShow(){
+  const c=document.getElementById('genCard');
+  c.classList.remove('done','error');
+  document.getElementById('genTitle').textContent='Generando informe';
+  document.getElementById('genSub').textContent='Creando el documento Word…';
+  document.getElementById('genOverlay').classList.add('open');
+}
+function genSuccess(name){
+  const c=document.getElementById('genCard');c.classList.remove('error');c.classList.add('done');
+  document.getElementById('genTitle').textContent='¡Informe generado!';
+  document.getElementById('genSub').textContent=name;
+  setTimeout(genHide,1700);
+}
+function genError(msg){
+  const c=document.getElementById('genCard');c.classList.remove('done');c.classList.add('error');
+  document.getElementById('genTitle').textContent='No se pudo generar';
+  document.getElementById('genSub').textContent=msg||'Ocurrió un error inesperado.';
+  setTimeout(genHide,3200);
+}
+function genHide(){document.getElementById('genOverlay').classList.remove('open');}
+
+// ══ TOAST ══
+function tigToast(msg,type='ok'){
+  const t=document.getElementById('tigToast');
+  t.textContent=msg;t.className='tig-toast show '+type;
+  clearTimeout(t._t);t._t=setTimeout(()=>{t.className='tig-toast';},2600);
+}
+function removeCardAnimated(card){
+  if(!card)return;
+  card.style.height=card.offsetHeight+'px';
+  card.classList.add('removing');
+  requestAnimationFrame(()=>{card.style.height='0';card.style.marginTop='0';card.style.marginBottom='0';});
+  setTimeout(()=>card.remove(),340);
 }
 
 // ══ HISTORIAL ══
@@ -1936,14 +2046,8 @@ async function restaurar(id) {
     if(!r.ok) throw new Error('Error al restaurar');
     await loadPapelera();
     await loadHist(true);
-    // Show brief confirmation
-    const list = document.getElementById('papList');
-    const toast = document.createElement('div');
-    toast.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#2e7d32;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:700;z-index:999;';
-    toast.textContent='✅ Informe restaurado al historial';
-    document.body.appendChild(toast);
-    setTimeout(()=>toast.remove(), 2500);
-  } catch(e) { alert('Error: '+e.message); }
+    tigToast('↩ Informe restaurado al historial','ok');
+  } catch(e) { tigToast('Error: '+e.message,'err'); }
 }
 
 function openConfirmPerm(id, sitio) {
@@ -1955,55 +2059,76 @@ function closeConfirmPerm(){ document.getElementById('confirmPerm').classList.re
 async function confirmPermDelete() {
   if(!pendingPermId) return;
   const id = pendingPermId;
-  closeConfirmPerm();
+  const box=document.getElementById('confirmPerm');
+  const btn=box.querySelector('.cbtn.confirm');
+  const cancel=box.querySelector('.cbtn.cancel');
+  btn.disabled=true;cancel.disabled=true;btn.innerHTML='<span class="cspin"></span>';
   try {
     const resp = await fetch(`${SERVER}/papelera/${id}`, {method:'DELETE'});
     if(!resp.ok){
       let msg='Error '+resp.status;
       try{const t=await resp.text();try{const j=JSON.parse(t);if(j&&j.error)msg=j.error;}catch{if(t)msg=t.slice(0,300);}}catch{}
-      alert('No se pudo borrar definitivamente:\n'+msg);
+      throw new Error(msg);
     }
+    closeConfirmPerm();
     await loadPapelera();
-  } catch(e){ alert('Error: '+e.message); }
+    tigToast('Informe eliminado definitivamente','ok');
+  } catch(e){ tigToast('No se pudo borrar: '+e.message,'err'); }
+  finally{ btn.disabled=false;cancel.disabled=false;btn.textContent='Eliminar'; }
 }
 
 function vaciarPapelera(){ document.getElementById('confirmVaciar').classList.add('open'); }
 function closeConfirmVaciar(){ document.getElementById('confirmVaciar').classList.remove('open'); }
 async function confirmVaciar(){
-  closeConfirmVaciar();
+  const box=document.getElementById('confirmVaciar');
+  const btn=box.querySelector('.cbtn.confirm');
+  const cancel=box.querySelector('.cbtn.cancel');
+  btn.disabled=true;cancel.disabled=true;btn.innerHTML='<span class="cspin"></span>';
   try{
     const resp = await fetch(`${SERVER}/papelera`, {method:'DELETE'});
     if(!resp.ok){
       let msg='Error '+resp.status;
       try{const t=await resp.text();try{const j=JSON.parse(t);if(j&&j.error)msg=j.error;}catch{if(t)msg=t.slice(0,300);}}catch{}
-      alert('No se pudo vaciar la papelera:\n'+msg);
+      throw new Error(msg);
     }
+    closeConfirmVaciar();
     await loadPapelera();
-  } catch(e){ alert('Error: '+e.message); }
+    tigToast('Papelera vaciada','ok');
+  } catch(e){ tigToast('No se pudo vaciar: '+e.message,'err'); }
+  finally{ btn.disabled=false;cancel.disabled=false;btn.textContent='Vaciar todo'; }
 }
 document.getElementById('confirmPerm').addEventListener('click',function(e){if(e.target===this)closeConfirmPerm();});
 document.getElementById('confirmVaciar').addEventListener('click',function(e){if(e.target===this)closeConfirmVaciar();});
 
-// Fix: immediate UI remove on delete from historial
+// Borrado con feedback: spinner → salida suave de la tarjeta → toast
 async function confirmDelete(){
   if(!pendingDeleteId)return;
   const id=pendingDeleteId;
-  closeConfirm();
-  // Remove from UI immediately
-  const card=document.querySelector(`[onclick="toggleInf('${id}')"]`)?.closest('.inf-card');
-  if(card)card.remove();
-  allRecords=allRecords.filter(r=>r.id!==id);
-  document.getElementById('histTabNum').textContent=allRecords.length||'0';
+  const box=document.getElementById('confirmDel');
+  const btn=box.querySelector('.cbtn.confirm');
+  const cancel=box.querySelector('.cbtn.cancel');
+  btn.disabled=true;cancel.disabled=true;btn.innerHTML='<span class="cspin"></span>';
   try{
     const resp=await fetch(`${SERVER}/registro/${id}`,{method:'DELETE'});
     if(!resp.ok){
       let msg='Error '+resp.status;
       try{const t=await resp.text();try{const j=JSON.parse(t);if(j&&j.error)msg=j.error;}catch{if(t)msg=t.slice(0,300);}}catch{}
-      alert('No se pudo borrar el informe:\n'+msg);
+      throw new Error(msg);
     }
-    await loadHist(true);
+    closeConfirm();
+    const card=document.querySelector(`[onclick="toggleInf('${id}')"]`)?.closest('.inf-card');
+    removeCardAnimated(card);
+    allRecords=allRecords.filter(r=>r.id!==id);
+    document.getElementById('histTabNum').textContent=allRecords.length||'0';
+    tigToast('🗑️ Informe movido a la papelera','ok');
     await loadPapelera(true);
-  }catch(e){alert('Error al mover a papelera: '+e.message);}
+    setTimeout(()=>loadHist(true),600);
+  }catch(e){
+    tigToast('No se pudo borrar: '+e.message,'err');
+  }finally{
+    btn.disabled=false;cancel.disabled=false;btn.textContent='Borrar';
+    pendingDeleteId=null;
+  }
 }
 
 // ══ INIT ══

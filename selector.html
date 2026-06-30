@@ -8,11 +8,21 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
+:root{
+  --ink:#1C1F3B;
+  --bg:#F6F7FB;
+  --tigo:#0073EA;
+  --tigo-2:#1976D2;
+  --wom:#4A0E8F;
+  --wom-2:#3A0A6E;
+  --ease-out:cubic-bezier(0.23,1,0.32,1);
+  --ease-in-out:cubic-bezier(0.77,0,0.175,1);
+}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{
   font-family:'Poppins',system-ui,sans-serif;
   min-height:100vh;
-  background:#F6F7FB;
+  background:var(--bg);
   display:flex;
   flex-direction:column;
   align-items:center;
@@ -21,7 +31,7 @@ body{
 /* ── HEADER ── */
 header{
   width:100%;
-  background:#1C1F3B;
+  background:var(--ink);
   padding:14px 24px;
   display:flex;
   align-items:center;
@@ -79,7 +89,7 @@ main{
 /* ── CARDS ── */
 .cards{
   display:flex;
-  gap:20px;
+  gap:24px;
   width:100%;
   justify-content:center;
   flex-wrap:wrap;
@@ -89,75 +99,97 @@ main{
   flex:1 1 260px;
   max-width:320px;
   background:#fff;
-  border-radius:16px;
-  padding:0 0 28px;
+  border-radius:18px;
   display:flex;
   flex-direction:column;
-  align-items:center;
-  gap:0;
-  box-shadow:0 2px 12px rgba(0,0,0,.07),0 1px 4px rgba(0,0,0,.04);
+  box-shadow:0 2px 12px rgba(0,0,0,.06),0 1px 3px rgba(0,0,0,.04);
   cursor:pointer;
   text-decoration:none;
-  transition:transform .2s ease, box-shadow .2s ease, border-color .2s;
+  transition:transform .35s var(--ease-out), box-shadow .35s var(--ease-out), border-color .25s;
   position:relative;
   overflow:hidden;
   border:1.5px solid #E8EAED;
+  /* entrada escalonada */
+  opacity:0;
+  transform:translateY(14px);
+  animation:cardIn .5s var(--ease-out) forwards;
 }
-.card:hover{
-  transform:translateY(-5px);
-  box-shadow:0 14px 44px rgba(0,0,0,.14),0 4px 14px rgba(0,0,0,.07);
+.card.tigo{animation-delay:.06s;}
+.card.wom{animation-delay:.14s;}
+@keyframes cardIn{to{opacity:1;transform:translateY(0);}}
+
+@media(hover:hover) and (pointer:fine){
+  .card:hover{
+    transform:translateY(-6px);
+    box-shadow:0 18px 48px rgba(0,0,0,.16),0 6px 16px rgba(0,0,0,.07);
+    border-color:transparent;
+  }
+  .card:hover .card-banner-logo{transform:scale(1.04);}
+  .card:hover .card-arrow{transform:translateX(3px);}
+}
+.card:active{transform:translateY(-2px) scale(.99);}
+.card:focus-visible{
+  outline:none;
   border-color:transparent;
+  box-shadow:0 0 0 3px #fff,0 0 0 5.5px var(--ring),0 14px 40px rgba(0,0,0,.14);
 }
-.card:active{transform:translateY(-1px);}
+.card.tigo{--ring:var(--tigo);}
+.card.wom{--ring:var(--wom);}
 
-.card-top{
+/* Banner de marca */
+.card-banner{
   width:100%;
-  height:6px;
-  border-radius:14px 14px 0 0;
-  flex-shrink:0;
-}
-.card.tigo .card-top{background:linear-gradient(90deg,#0073EA,#1976D2);}
-.card.wom .card-top{background:linear-gradient(90deg,#6161FF,#7B1FA2);}
-
-.card-inner{
-  display:flex;flex-direction:column;align-items:center;
-  gap:16px;padding:30px 28px 0;width:100%;
-}
-
-.card-logo{
-  height:80px;
+  height:60px;
   display:flex;
   align-items:center;
   justify-content:center;
+  position:relative;
+  overflow:hidden;
 }
-.card-logo img{max-height:80px;max-width:200px;object-fit:contain;}
-
+.card.tigo .card-banner{background:var(--tigo);}
+.card.wom .card-banner{background:var(--wom);}
+.card-banner-logo{
+  position:relative;z-index:1;
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .35s var(--ease-out);
+}
+.card-banner-logo img{
+  max-height:46px;max-width:170px;object-fit:contain;
+  /* logo azul de Tigo → blanco sobre el banner */
+  filter:brightness(0) invert(1);
+}
 .wom-text{
-  font-size:56px;font-weight:900;color:#7B1FA2;letter-spacing:-3px;line-height:1;font-style:italic;
-  font-family:'Poppins',sans-serif;
+  font-size:42px;font-weight:900;color:#fff;letter-spacing:-2.5px;line-height:1;font-style:italic;
 }
 
+/* Cuerpo */
+.card-inner{
+  display:flex;flex-direction:column;align-items:center;
+  gap:9px;padding:24px 28px 4px;width:100%;
+}
 .card-label{
-  font-size:13px;font-weight:700;color:#323338;letter-spacing:.2px;text-transform:uppercase;
+  font-size:13px;font-weight:700;color:#323338;letter-spacing:.4px;text-transform:uppercase;
 }
 .card-desc{
-  font-size:12px;font-weight:400;color:#676879;text-align:center;line-height:1.65;
+  font-size:12.5px;font-weight:400;color:#676879;text-align:center;line-height:1.6;
 }
 
 .card-btn{
   width:calc(100% - 56px);
-  margin:16px 28px 0;
-  padding:11px 24px;
-  border-radius:8px;
+  margin:18px 28px 28px;
+  padding:12px 24px;
+  border-radius:10px;
+  display:flex;align-items:center;justify-content:center;gap:7px;
   font-size:13px;font-weight:600;font-family:'Poppins',sans-serif;
   border:none;cursor:pointer;
-  transition:opacity .15s, transform .1s;
+  color:#fff;
+  transition:filter .15s, box-shadow .2s var(--ease-out);
   letter-spacing:.1px;
 }
-.card-btn:hover{opacity:.88;}
-.card-btn:active{transform:scale(.97);}
-.card.tigo .card-btn{background:#0073EA;color:#fff;}
-.card.wom .card-btn{background:#6161FF;color:#fff;}
+.card.tigo .card-btn{background:var(--tigo);box-shadow:0 6px 16px rgba(0,115,234,.32);}
+.card.wom .card-btn{background:var(--wom);box-shadow:0 6px 16px rgba(74,14,143,.34);}
+.card:hover .card-btn{filter:brightness(1.06);}
+.card-arrow{transition:transform .3s var(--ease-out);font-size:15px;line-height:1;}
 
 /* ── FOOTER ── */
 footer{
@@ -166,7 +198,7 @@ footer{
   font-size:11px;
   font-weight:400;
   text-align:center;
-  background:#F6F7FB;
+  background:var(--bg);
   width:100%;
   border-top:1px solid #E8EAED;
 }
@@ -174,6 +206,10 @@ footer{
 @media(max-width:480px){
   .hero h1{font-size:22px;}
   .card-btn{font-size:12px;}
+}
+@media(prefers-reduced-motion:reduce){
+  .card{animation:none;opacity:1;transform:none;}
+  *{transition-duration:.01ms !important;}
 }
 </style>
 </head>
@@ -195,28 +231,30 @@ footer{
 
     <!-- TIGO -->
     <a href="/tigo" class="card tigo">
-      <div class="card-top"></div>
-      <div class="card-inner">
-        <div class="card-logo">
+      <div class="card-banner">
+        <div class="card-banner-logo">
           <img src="tigo-logo.png" alt="Tigo">
         </div>
-        <span class="card-label">Proyecto TIGO</span>
-        <span class="card-desc">Informes de mantenimiento<br>de equipos de clima</span>
       </div>
-      <button class="card-btn">Ingresar →</button>
+      <div class="card-inner">
+        <span class="card-label">Proyecto TIGO</span>
+        <span class="card-desc">Informes correctivos<br>de equipos de clima</span>
+      </div>
+      <button class="card-btn" tabindex="-1">Ingresar <span class="card-arrow">→</span></button>
     </a>
 
     <!-- WOM -->
     <a href="/wom" class="card wom">
-      <div class="card-top"></div>
-      <div class="card-inner">
-        <div class="card-logo">
+      <div class="card-banner">
+        <div class="card-banner-logo">
           <span class="wom-text">wom</span>
         </div>
-        <span class="card-label">Proyecto WOM</span>
-        <span class="card-desc">Informes de mantenimiento<br>de equipos de clima</span>
       </div>
-      <button class="card-btn">Ingresar →</button>
+      <div class="card-inner">
+        <span class="card-label">Proyecto WOM</span>
+        <span class="card-desc">Informes correctivos<br>de equipos de clima</span>
+      </div>
+      <button class="card-btn" tabindex="-1">Ingresar <span class="card-arrow">→</span></button>
     </a>
 
   </div>
