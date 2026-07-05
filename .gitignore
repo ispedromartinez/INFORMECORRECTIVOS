@@ -7,6 +7,8 @@ papelera.json
 informes_wom/
 registro_wom.json
 papelera_wom.json
+papelera_wom/
+.bak_predeploy/
 server.log
 server_err.log
 .claude/

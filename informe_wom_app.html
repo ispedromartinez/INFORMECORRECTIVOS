@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
 <title>Informe WOM – ICETEL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,10 +18,14 @@
   --ease-out:cubic-bezier(.23,1,.32,1);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{font-family:'Poppins',system-ui,sans-serif;background:#F6F7FB;color:var(--text);min-height:100vh;}
+body{font-family:'Poppins',system-ui,sans-serif;background:#F6F7FB;color:var(--text);min-height:100vh;min-height:100dvh;}
+a,button,input,select,textarea,.tab{touch-action:manipulation;}
 
 /* ── HEADER ── */
-header{background:#1C1F3B;color:#fff;padding:13px 18px 11px;position:sticky;top:0;z-index:200;box-shadow:0 2px 12px rgba(0,0,0,.25);border-bottom:3px solid #4A0E8F;}
+/* Header y tabs viven juntos en .top-sticky: un solo bloque pegado arriba,
+   sin offset fijo que se rompa cuando el header cambia de alto en móvil */
+.top-sticky{position:sticky;top:0;z-index:200;}
+header{background:#1C1F3B;color:#fff;padding:13px 18px 11px;padding-left:max(18px,env(safe-area-inset-left));padding-right:max(18px,env(safe-area-inset-right));box-shadow:0 2px 12px rgba(0,0,0,.25);border-bottom:3px solid #4A0E8F;}
 .hdr-inner{max-width:var(--max-w);margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;}
 .hdr-left{display:flex;align-items:center;gap:12px;}
 .hdr-gear{font-size:24px;line-height:1;opacity:.92;flex-shrink:0;}
@@ -40,7 +44,7 @@ header{background:#1C1F3B;color:#fff;padding:13px 18px 11px;position:sticky;top:
 .srv-dot.on{background:#22c55e;}
 
 /* ── TABS ── */
-.tabs{background:#fff;border-bottom:2px solid var(--border);overflow-x:auto;scrollbar-width:none;position:sticky;top:57px;z-index:150;box-shadow:0 2px 8px rgba(0,0,0,.04);padding:8px 0;}
+.tabs{background:#fff;border-bottom:2px solid var(--border);overflow-x:auto;scrollbar-width:none;box-shadow:0 2px 8px rgba(0,0,0,.04);padding:8px 0;}
 .tabs::-webkit-scrollbar{display:none;}
 .tabs-inner{margin:0 auto;display:flex;gap:4px;background:#EDEEF2;border-radius:12px;padding:4px;width:fit-content;}
 .tab{flex:0 0 auto;padding:9px 16px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;border:none;border-radius:9px;white-space:nowrap;transition:.18s;}
@@ -94,7 +98,31 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 /* ── RESUMEN ── */
 .resumen-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 .resumen-grid textarea{min-height:130px;}
-@media(max-width:580px){.resumen-grid{grid-template-columns:1fr;}.row-2,.row-3{grid-template-columns:1fr;}}
+@media(max-width:580px){
+  .resumen-grid{grid-template-columns:1fr;}
+  .row-2,.row-3{grid-template-columns:1fr;}
+  /* 16px en inputs: evita el auto-zoom de iOS al enfocar y mejora legibilidad */
+  .field input,.field select,.field textarea,
+  .tecnico-row input,.tecnico-row select,.foto-item .cap input{font-size:16px;}
+  #ticket{font-size:16px!important;}
+  /* Espaciado más compacto */
+  header{padding-top:11px;padding-bottom:9px;}
+  .hdr-left h1{font-size:13px;}
+  .hdr-left p{font-size:10px;}
+  .hdr-logo-app{height:24px;}
+  .hdr-logo-pill{padding:4px 9px;}
+  main{padding:12px 12px 40px;}
+  .card{padding:16px 14px;}
+  /* Targets táctiles ≥44px */
+  .tab{padding:12px 13px;min-height:44px;display:inline-flex;align-items:center;}
+  .btn-dl,.btn-del{padding:10px 14px;min-height:42px;}
+  .act-btn{min-height:44px;}
+  .modal-close{width:38px;height:38px;}
+  /* Botones sobre las fotos más grandes para el dedo */
+  .foto-item .remove,.foto-rst,.foto-rot{width:32px;height:32px;font-size:16px;}
+  .foto-rst{right:44px;}
+  .foto-rot{right:82px;}
+}
 
 /* ── FOTOS ── */
 .drop-zone{border:2px dashed var(--mag-b);border-radius:var(--r);background:var(--mag-l);padding:28px 20px;text-align:center;cursor:pointer;transition:border-color .18s,background .18s;margin-bottom:16px;}
@@ -178,7 +206,7 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 /* ── MODAL ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px);}
 .modal-overlay.open{display:flex;}
-.modal-box{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:22px;max-height:80vh;overflow-y:auto;}
+.modal-box{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:22px;padding-bottom:calc(22px + env(safe-area-inset-bottom,0px));max-height:85dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .modal-title{font-size:15px;font-weight:700;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;}
 .modal-close{background:#f1f5f9;border:none;font-size:16px;cursor:pointer;color:var(--muted);width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
 .modal-info{font-size:12px;color:var(--muted);margin-bottom:14px;padding:9px 13px;background:#f8fafc;border-radius:8px;}
@@ -239,7 +267,7 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 }
 
 /* ── TOAST ── */
-#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:#1e293b;color:#fff;padding:12px 22px;border-radius:50px;font-size:13px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.25);transition:transform .3s ease;z-index:9999;pointer-events:none;white-space:nowrap;}
+#toast{position:fixed;bottom:calc(24px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%) translateY(100px);background:#1e293b;color:#fff;padding:12px 22px;border-radius:50px;font-size:13px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.25);transition:transform .3s ease;z-index:9999;pointer-events:none;max-width:calc(100vw - 32px);white-space:normal;text-align:center;}
 #toast.show{transform:translateX(-50%) translateY(0);}
 #toast.ok{background:#15803d;}
 #toast.err{background:#dc2626;}
@@ -317,6 +345,7 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 </head>
 <body>
 
+<div class="top-sticky">
 <header>
   <div class="hdr-inner">
     <div class="hdr-left">
@@ -344,6 +373,7 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
     <div class="tab" data-tab="5"><span class="num">🗑</span>Papelera</div>
   </div>
 </nav>
+</div><!-- /.top-sticky -->
 
 <main>
 
@@ -411,7 +441,7 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
         <label>Ticket <span style="color:var(--red)">*</span></label>
         <div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;background:#fff;transition:border-color .18s,box-shadow .18s;" id="ticket-wrap">
           <span style="padding:10px 10px 10px 12px;font-size:14px;font-weight:700;color:var(--mag);background:var(--mag-l);border-right:1.5px solid var(--mag-b);white-space:nowrap;user-select:none;">WT-</span>
-          <input type="text" id="ticket" placeholder="000000" oninput="updateBadge()" style="flex:1;border:none;outline:none;padding:10px 12px;font-size:14px;font-family:inherit;color:var(--text);background:transparent;">
+          <input type="text" id="ticket" placeholder="000000" inputmode="numeric" oninput="updateBadge()" style="flex:1;border:none;outline:none;padding:10px 12px;font-size:14px;font-family:inherit;color:var(--text);background:transparent;">
         </div>
       </div>
       <div class="field">

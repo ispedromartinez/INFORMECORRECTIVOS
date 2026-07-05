@@ -3,6 +3,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const fs = require('fs');
+const os = require('os');
 const { execFile } = require('child_process');
 const path = require('path');
 const XLSXStyle = require('xlsx-js-style');
@@ -38,16 +39,16 @@ if (supabase) {
 const app = express();
 app.use(helmet({ contentSecurityPolicy: false })); // CSP off: HTML usa scripts inline
 
-const PORT_FOR_CORS = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 const allowedOrigins = [
-  `http://localhost:${PORT_FOR_CORS}`,
-  `http://127.0.0.1:${PORT_FOR_CORS}`,
+  `http://localhost:${PORT}`,
+  `http://127.0.0.1:${PORT}`,
   'null', // file:// (HTML abierto directo con doble clic, ver LEEME.txt)
   ...(process.env.ALLOWED_ORIGIN ? [process.env.ALLOWED_ORIGIN] : []),
   // En Render el propio dominio se expone aquí: permite el same-origin del deploy
   ...(process.env.RENDER_EXTERNAL_URL ? [process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '')] : []),
 ];
-const lanOriginPattern = new RegExp(`^http://192\\.168\\.\\d{1,3}\\.\\d{1,3}:${PORT_FOR_CORS}$`);
+const lanOriginPattern = new RegExp(`^http://192\\.168\\.\\d{1,3}\\.\\d{1,3}:${PORT}$`);
 // Cualquier subdominio https de Render (el sitio llamándose a sí mismo)
 const renderOriginPattern = /^https:\/\/[a-z0-9-]+\.onrender\.com$/i;
 
@@ -79,7 +80,12 @@ const heavyLimiter = rateLimit({
 
 app.use(generalLimiter);
 app.use(express.json({ limit: '80mb' }));
-app.use(express.static(__dirname));
+// Solo los assets que usan las páginas. Antes se servía todo __dirname con
+// express.static: exponía server.js, registro.json y los .docx de informes/,
+// y la carpeta física papelera/ tapaba la ruta GET /papelera con un redirect.
+for (const asset of ['icetel-logo.png', 'tigo-logo.png', 'wom-logo.png']) {
+  app.get('/' + asset, (req, res) => res.sendFile(path.join(__dirname, asset)));
+}
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'selector.html')));
 app.get('/tigo', (req, res) => res.sendFile(path.join(__dirname, 'informe_clima_app.html')));
 app.get('/wom', (req, res) => res.sendFile(path.join(__dirname, 'informe_wom_app.html')));
@@ -110,6 +116,27 @@ function convertDocxToPdf(docxPath) {
       resolve(pdfPath);
     });
   });
+}
+
+// Convierte el .docx a PDF y lo sirve inline; borra el PDF temporal tras leerlo
+// para que pdf_tmp no crezca sin límite.
+async function servirPdf(res, entry, dir, storagePrefix) {
+  const docxPath = path.join(dir, entry.filename);
+  if (!fs.existsSync(docxPath)) {
+    const buffer = await storageDownload(`${storagePrefix}/${entry.filename}`);
+    if (!buffer) return res.status(404).json({ error: 'Archivo no existe' });
+    fs.writeFileSync(docxPath, buffer);
+  }
+  try {
+    const pdfPath = await convertDocxToPdf(docxPath);
+    const pdfBuffer = fs.readFileSync(pdfPath);
+    try { fs.unlinkSync(pdfPath); } catch {}
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${entry.filename.replace(/\.docx$/, '.pdf')}"`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 }
 
 // ── Row mappers – Clima ────────────────────────────────────────
@@ -173,7 +200,8 @@ function makeRepo({ table, papelera, dbFile, papeleraFile, from, to,
   const filt = (rows, q, fields) => {
     if (!q) return rows;
     const ql = q.toLowerCase();
-    return rows.filter(r => fields.some(k => (r[k] || '').toLowerCase().includes(ql)));
+    // String(...): campos como num_ot pueden venir numéricos de Supabase
+    return rows.filter(r => fields.some(k => String(r[k] ?? '').toLowerCase().includes(ql)));
   };
   return {
     async list(q) {
@@ -186,9 +214,12 @@ function makeRepo({ table, papelera, dbFile, papeleraFile, from, to,
     },
     async insert(entry) {
       if (supabase) {
-        const { error } = await supabase.from(table).insert(to(entry));
-        if (error) console.error(`${table} insert:`, error.message);
+        try {
+          const { error } = await supabase.from(table).insert(to(entry));
+          if (error) { console.error(`${table} insert:`, error); return { error: `${table}: ${error.message}${error.hint ? ' ('+error.hint+')' : ''}` }; }
+        } catch (e) { console.error(`${table} insert (excepción):`, e); return { error: `${table}: ${e.message || e}` }; }
       } else { const db = loadDB(); db.unshift(entry); saveDB(db); }
+      return { ok: true };
     },
     async find(id) {
       if (supabase) {
@@ -262,9 +293,6 @@ const { list: dbClimaList, insert: dbClimaInsert, find: dbClimaFind, remove: dbC
   papSearchFields: ['nombreSitio', 'codInforme', 'tecnico'],
   delCol: 'fecha_eliminado', delKey: 'fechaEliminado'
 });
-
-// Logo base64 embedded
-const LOGO_B64 = fs.readFileSync(path.join(__dirname, 'logo.jpeg'), null) || null;
 
 // ── Design tokens (matching original exactly) ─────────────
 const BL  = 'DEEAF6';   // azul claro — celdas etiqueta
@@ -802,7 +830,7 @@ app.get('/ping', (req,res) => res.json({ok:true}));
 
 // Prueba de configuración de correo: envía un email de test a MAIL_TO.
 // Uso: abrir /probar-correo en el navegador. Devuelve el resultado real.
-app.get('/probar-correo', async (req, res) => {
+app.get('/probar-correo', heavyLimiter, async (req, res) => {
   const via = BREVO_API_KEY ? 'API Brevo (HTTPS)' : `SMTP ${MAIL_HOST}:${MAIL_PORT}`;
   if (!mailConfigured()) {
     return res.json({ ok: false, error: 'Correo desactivado: define BREVO_API_KEY (recomendado en Render) o MAIL_USER/MAIL_PASS.' });
@@ -834,7 +862,7 @@ app.get('/ping-supabase', async (req, res) => {
   res.json({ ok: true, bucket: SUPABASE_BUCKET });
 });
 
-app.get('/test-insert', async (req, res) => {
+app.get('/test-insert', heavyLimiter, async (req, res) => {
   if (!supabase) return res.json({ ok: false, error: 'Supabase no configurado' });
   const testId = 'test-' + Date.now();
   const { error: insertError } = await supabase.from('informes_clima').insert({
@@ -926,24 +954,10 @@ app.get('/descargar/:id', async (req,res) => {
   res.send(buffer);
 });
 
-app.get('/ver-pdf/:id', async (req, res) => {
+app.get('/ver-pdf/:id', heavyLimiter, async (req, res) => {
   const entry = await dbClimaFind(req.params.id);
   if (!entry) return res.status(404).json({ error: 'No encontrado' });
-  const docxPath = path.join(DOCS_DIR, entry.filename);
-  if (!fs.existsSync(docxPath)) {
-    const buffer = await storageDownload(`clima/${entry.filename}`);
-    if (!buffer) return res.status(404).json({ error: 'Archivo no existe' });
-    fs.writeFileSync(docxPath, buffer);
-  }
-  try {
-    const pdfPath = await convertDocxToPdf(docxPath);
-    const pdfBuffer = fs.readFileSync(pdfPath);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${entry.filename.replace(/\.docx$/, '.pdf')}"`);
-    res.send(pdfBuffer);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  await servirPdf(res, entry, DOCS_DIR, 'clima');
 });
 
 app.post('/enviar/:id', heavyLimiter, async (req,res) => {
@@ -994,17 +1008,24 @@ app.get('/papelera', async (req,res) => {
 
 // Restore from papelera
 app.post('/papelera/restaurar/:id', async (req,res) => {
+ try {
   const entry = await dbPapeleraFind(req.params.id);
   if (!entry) return res.status(404).json({error:'No encontrado'});
-  await storageMove(`clima/papelera/${entry.filename}`, `clima/${entry.filename}`);
+  const { fechaEliminado, ...clean } = entry;
+  // 1) Reinsertar en el registro PRIMERO (si falla, el informe sigue en la papelera)
+  const ins = await dbClimaInsert(clean);
+  if (ins && ins.error) return res.status(500).json({ error: 'No se pudo restaurar: ' + ins.error });
+  // 2) Quitar de la papelera (si falla, deshacer el paso 1)
+  const del = await dbPapeleraDelete(entry.id);
+  if (del && del.error) { await dbClimaDelete(entry.id); return res.status(500).json({ error: del.error }); }
+  // 3) Mover el archivo de vuelta (best-effort)
   try {
+    await storageMove(`clima/papelera/${entry.filename}`, `clima/${entry.filename}`);
     const srcPath = path.join(PAPELERA_DIR, entry.filename);
     if (fs.existsSync(srcPath)) fs.renameSync(srcPath, path.join(DOCS_DIR, entry.filename));
-  } catch(e) {}
-  const { fechaEliminado, ...clean } = entry;
-  await dbPapeleraDelete(entry.id);
-  await dbClimaInsert(clean);
+  } catch(e) { console.error('restaurar archivo:', e.message); }
   res.json({ok:true});
+ } catch(e) { console.error('POST /papelera/restaurar:', e); res.status(500).json({ error: 'No se pudo restaurar: '+(e.message||e) }); }
 });
 
 // Delete permanently from papelera
@@ -1567,24 +1588,10 @@ app.get('/descargar-wom/:id', async (req, res) => {
   res.send(buffer);
 });
 
-app.get('/ver-pdf-wom/:id', async (req, res) => {
+app.get('/ver-pdf-wom/:id', heavyLimiter, async (req, res) => {
   const entry = await dbWomFind(req.params.id);
   if (!entry) return res.status(404).json({ error: 'No encontrado' });
-  const docxPath = path.join(DOCS_DIR_WOM, entry.filename);
-  if (!fs.existsSync(docxPath)) {
-    const buffer = await storageDownload(`wom/${entry.filename}`);
-    if (!buffer) return res.status(404).json({ error: 'Archivo no existe' });
-    fs.writeFileSync(docxPath, buffer);
-  }
-  try {
-    const pdfPath = await convertDocxToPdf(docxPath);
-    const pdfBuffer = fs.readFileSync(pdfPath);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${entry.filename.replace(/\.docx$/, '.pdf')}"`);
-    res.send(pdfBuffer);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  await servirPdf(res, entry, DOCS_DIR_WOM, 'wom');
 });
 
 app.delete('/registro-wom/:id', async (req, res) => {
@@ -1610,17 +1617,24 @@ app.delete('/registro-wom/:id', async (req, res) => {
 app.get('/papelera-wom', async (_req, res) => res.json(await dbPapeleraWomList()));
 
 app.post('/papelera-wom/restaurar/:id', async (req, res) => {
+ try {
   const entry = await dbPapeleraWomFind(req.params.id);
   if (!entry) return res.status(404).json({error:'No encontrado'});
-  await storageMove(`wom/papelera/${entry.filename}`, `wom/${entry.filename}`);
+  const { deletedAt, ...clean } = entry;
+  // 1) Reinsertar en el registro PRIMERO (si falla, el informe sigue en la papelera)
+  const ins = await dbWomInsert(clean);
+  if (ins && ins.error) return res.status(500).json({ error: 'No se pudo restaurar: ' + ins.error });
+  // 2) Quitar de la papelera (si falla, deshacer el paso 1)
+  const del = await dbPapeleraWomDelete(entry.id);
+  if (del && del.error) { await dbWomDelete(entry.id); return res.status(500).json({ error: del.error }); }
+  // 3) Mover el archivo de vuelta (best-effort)
   try {
+    await storageMove(`wom/papelera/${entry.filename}`, `wom/${entry.filename}`);
     const fp = path.join(PAPELERA_DIR_WOM, entry.filename);
     if (fs.existsSync(fp)) fs.renameSync(fp, path.join(DOCS_DIR_WOM, entry.filename));
-  } catch(e) {}
-  const { deletedAt, ...clean } = entry;
-  await dbPapeleraWomDelete(entry.id);
-  await dbWomInsert(clean);
+  } catch(e) { console.error('restaurar archivo (wom):', e.message); }
   res.json({ok:true});
+ } catch(e) { console.error('POST /papelera-wom/restaurar:', e); res.status(500).json({ error: 'No se pudo restaurar: '+(e.message||e) }); }
 });
 
 app.delete('/papelera-wom/:id', async (req, res) => {
@@ -1681,8 +1695,6 @@ async function purgarTodasLasPapeleras() {
   await purgarPapelera('wom',   { papList: dbPapeleraWomList, papDelete: dbPapeleraWomDelete, prefix: 'wom',   dir: PAPELERA_DIR_WOM, delKey: 'deletedAt' });
 }
 
-const PORT = process.env.PORT || 3000;
-const os = require('os');
 function getLocalIP() {
   for (const ifaces of Object.values(os.networkInterfaces())) {
     for (const iface of ifaces) {

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>ICETEL – Selección de Proyecto</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,11 +22,13 @@
 body{
   font-family:'Poppins',system-ui,sans-serif;
   min-height:100vh;
+  min-height:100dvh;
   background:var(--bg);
   display:flex;
   flex-direction:column;
   align-items:center;
 }
+a,button{touch-action:manipulation;}
 
 /* ── HEADER ── */
 header{
@@ -204,8 +206,13 @@ footer{
 }
 
 @media(max-width:480px){
+  .hero{padding:36px 20px 42px;}
   .hero h1{font-size:22px;}
-  .card-btn{font-size:12px;}
+  main{padding:26px 16px 36px;}
+  .cards{gap:16px;}
+  .card{max-width:none;}
+  .card-btn{font-size:13px;min-height:46px;}
+  footer{padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));}
 }
 @media(prefers-reduced-motion:reduce){
   .card{animation:none;opacity:1;transform:none;}
