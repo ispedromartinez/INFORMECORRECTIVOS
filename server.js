@@ -118,25 +118,63 @@ function convertDocxToPdf(docxPath) {
   });
 }
 
-// Convierte el .docx a PDF y lo sirve inline; borra el PDF temporal tras leerlo
-// para que pdf_tmp no crezca sin límite.
-async function servirPdf(res, entry, dir, storagePrefix) {
+// Devuelve el buffer del PDF de un informe, convirtiendo el .docx UNA sola vez:
+// 1) cache local en pdf_tmp  2) cache remota en Supabase (${prefix}/pdf/)
+// 3) conversión con LibreOffice (y se guarda en ambas caches para la próxima).
+// El disco de Render es efímero, por eso la cache remota: tras un deploy o
+// reinicio el PDF se baja de Supabase en vez de reconvertirse.
+const pdfEnCurso = new Map(); // pdfName → Promise; evita convertir el mismo informe dos veces a la vez
+async function obtenerPdf(entry, dir, storagePrefix) {
+  const pdfName = entry.filename.replace(/\.docx$/, '.pdf');
+  if (pdfEnCurso.has(pdfName)) return pdfEnCurso.get(pdfName);
+  const promesa = obtenerPdfInterno(entry, dir, storagePrefix, pdfName)
+    .finally(() => pdfEnCurso.delete(pdfName));
+  pdfEnCurso.set(pdfName, promesa);
+  return promesa;
+}
+
+async function obtenerPdfInterno(entry, dir, storagePrefix, pdfName) {
+  const pdfPath = path.join(PDFS_DIR, pdfName);
+  if (fs.existsSync(pdfPath)) return fs.readFileSync(pdfPath);
+
+  const cached = await storageDownload(`${storagePrefix}/pdf/${pdfName}`);
+  if (cached) {
+    try { fs.writeFileSync(pdfPath, cached); } catch {}
+    return cached;
+  }
+
   const docxPath = path.join(dir, entry.filename);
   if (!fs.existsSync(docxPath)) {
     const buffer = await storageDownload(`${storagePrefix}/${entry.filename}`);
-    if (!buffer) return res.status(404).json({ error: 'Archivo no existe' });
+    if (!buffer) return null;
     fs.writeFileSync(docxPath, buffer);
   }
+  await convertDocxToPdf(docxPath); // deja el PDF en PDFS_DIR
+  const pdfBuffer = fs.readFileSync(pdfPath);
+  storageUpload(pdfBuffer, `${storagePrefix}/pdf/${pdfName}`, 'application/pdf')
+    .catch(e => console.error('cache pdf:', e.message));
+  return pdfBuffer;
+}
+
+async function servirPdf(res, entry, dir, storagePrefix) {
   try {
-    const pdfPath = await convertDocxToPdf(docxPath);
-    const pdfBuffer = fs.readFileSync(pdfPath);
-    try { fs.unlinkSync(pdfPath); } catch {}
+    const pdfBuffer = await obtenerPdf(entry, dir, storagePrefix);
+    if (!pdfBuffer) return res.status(404).json({ error: 'Archivo no existe' });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${entry.filename.replace(/\.docx$/, '.pdf')}"`);
+    // El informe no cambia una vez generado: el navegador puede reusar el PDF
+    res.setHeader('Cache-Control', 'private, max-age=86400');
     res.send(pdfBuffer);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+}
+
+// Pre-genera el PDF justo después de crear el informe (fire-and-forget),
+// para que el primer "Ver Informe" ya lo encuentre en cache.
+function precalcularPdf(entry, dir, storagePrefix) {
+  obtenerPdf(entry, dir, storagePrefix)
+    .catch(e => console.error('precalcular pdf:', e.message));
 }
 
 // ── Row mappers – Clima ────────────────────────────────────────
@@ -160,11 +198,11 @@ const toClima = e => ({
 });
 
 // ── Supabase Storage helpers ───────────────────────────────────
-async function storageUpload(buffer, storagePath) {
+async function storageUpload(buffer, storagePath, contentType) {
   if (!supabase) return;
   const { error } = await supabase.storage.from(SUPABASE_BUCKET)
     .upload(storagePath, buffer, {
-      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      contentType: contentType || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       upsert: true
     });
   if (error) console.error('storageUpload error:', error.message);
@@ -916,6 +954,7 @@ app.post('/generar', heavyLimiter, async (req,res) => {
       filename: fname
     };
     await dbClimaInsert(entry);
+    precalcularPdf(entry, DOCS_DIR, 'clima');
 
     // Auto-envío por correo (fire-and-forget: no retrasa la descarga)
     autoEnviarInforme({
@@ -1034,10 +1073,12 @@ app.delete('/papelera/:id', async (req,res) => {
   if (!entry) return res.status(404).json({error:'No encontrado'});
   const del = await dbPapeleraDelete(entry.id);
   if (del && del.error) return res.status(500).json({ error: del.error });
-  await storageRemove([`clima/papelera/${entry.filename}`]);
+  await storageRemove([`clima/papelera/${entry.filename}`, `clima/pdf/${entry.filename.replace(/\.docx$/, '.pdf')}`]);
   try {
     const fpath = path.join(PAPELERA_DIR, entry.filename);
     if (fs.existsSync(fpath)) fs.unlinkSync(fpath);
+    const pdfPath = path.join(PDFS_DIR, entry.filename.replace(/\.docx$/, '.pdf'));
+    if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
   } catch(e) {}
   res.json({ok:true});
 });
@@ -1048,9 +1089,12 @@ app.delete('/papelera', async (req,res) => {
   const cleared = await dbPapeleraClear();
   if (cleared && cleared.error) return res.status(500).json({ error: cleared.error });
   if (papelera.length) {
-    await storageRemove(papelera.map(e => `clima/papelera/${e.filename}`));
+    await storageRemove(papelera.flatMap(e => [`clima/papelera/${e.filename}`, `clima/pdf/${e.filename.replace(/\.docx$/, '.pdf')}`]));
     papelera.forEach(e => {
-      try { const f = path.join(PAPELERA_DIR, e.filename); if (fs.existsSync(f)) fs.unlinkSync(f); } catch(e2) {}
+      try {
+        const f = path.join(PAPELERA_DIR, e.filename); if (fs.existsSync(f)) fs.unlinkSync(f);
+        const p = path.join(PDFS_DIR, e.filename.replace(/\.docx$/, '.pdf')); if (fs.existsSync(p)) fs.unlinkSync(p);
+      } catch(e2) {}
     });
   }
   res.json({ok:true});
@@ -1552,6 +1596,7 @@ app.post('/generar-wom', heavyLimiter, async (req, res) => {
       filename: fname
     };
     await dbWomInsert(entry);
+    precalcularPdf(entry, DOCS_DIR_WOM, 'wom');
 
     // Auto-envío por correo (fire-and-forget: no retrasa la descarga)
     autoEnviarInforme({
@@ -1642,10 +1687,12 @@ app.delete('/papelera-wom/:id', async (req, res) => {
   if (!entry) return res.status(404).json({error:'No encontrado'});
   const del = await dbPapeleraWomDelete(entry.id);
   if (del && del.error) return res.status(500).json({ error: del.error });
-  await storageRemove([`wom/papelera/${entry.filename}`]);
+  await storageRemove([`wom/papelera/${entry.filename}`, `wom/pdf/${entry.filename.replace(/\.docx$/, '.pdf')}`]);
   try {
     const fp = path.join(PAPELERA_DIR_WOM, entry.filename);
     if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    const pdfPath = path.join(PDFS_DIR, entry.filename.replace(/\.docx$/, '.pdf'));
+    if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
   } catch(e) {}
   res.json({ok:true});
 });
@@ -1655,9 +1702,12 @@ app.delete('/papelera-wom', async (_req, res) => {
   const cleared = await dbPapeleraWomClear();
   if (cleared && cleared.error) return res.status(500).json({ error: cleared.error });
   if (papelera.length) {
-    await storageRemove(papelera.map(e => `wom/papelera/${e.filename}`));
+    await storageRemove(papelera.flatMap(e => [`wom/papelera/${e.filename}`, `wom/pdf/${e.filename.replace(/\.docx$/, '.pdf')}`]));
     papelera.forEach(e => {
-      try { const fp = path.join(PAPELERA_DIR_WOM, e.filename); if (fs.existsSync(fp)) fs.unlinkSync(fp); } catch(e2) {}
+      try {
+        const fp = path.join(PAPELERA_DIR_WOM, e.filename); if (fs.existsSync(fp)) fs.unlinkSync(fp);
+        const p = path.join(PDFS_DIR, e.filename.replace(/\.docx$/, '.pdf')); if (fs.existsSync(p)) fs.unlinkSync(p);
+      } catch(e2) {}
     });
   }
   res.json({ok:true});
@@ -1683,8 +1733,11 @@ async function purgarPapelera(nombre, { papList, papDelete, prefix, dir, delKey 
       if (isNaN(t) || t >= limite) continue;            // sin fecha válida o aún reciente → conservar
       const del = await papDelete(e.id);
       if (del && del.error) { console.error(`purga ${nombre} (${e.filename}):`, del.error); continue; }
-      await storageRemove([`${prefix}/papelera/${e.filename}`]);
-      try { const fp = path.join(dir, e.filename); if (fs.existsSync(fp)) fs.unlinkSync(fp); } catch {}
+      await storageRemove([`${prefix}/papelera/${e.filename}`, `${prefix}/pdf/${e.filename.replace(/\.docx$/, '.pdf')}`]);
+      try {
+        const fp = path.join(dir, e.filename); if (fs.existsSync(fp)) fs.unlinkSync(fp);
+        const p = path.join(PDFS_DIR, e.filename.replace(/\.docx$/, '.pdf')); if (fs.existsSync(p)) fs.unlinkSync(p);
+      } catch {}
       n++;
     }
     if (n) console.log(`🗑️  Papelera ${nombre}: ${n} informe(s) borrados definitivamente (>${RETENCION_DIAS} días).`);

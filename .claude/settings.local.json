@@ -71,7 +71,11 @@
       "Read(//c/Program Files/Google/Chrome/Application/**)",
       "Bash(where msedge *)",
       "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --force-device-scale-factor=1 --screenshot=C:/Users/Marti/AppData/Local/Temp/claude/C--Users-Marti-OneDrive-Documentos-Informes-Clima/1a28f6b6-51b8-42c4-9712-693cad4f171d/scratchpad/ruler2.png --window-size=375,400 --hide-scrollbars file:///C:/Users/Marti/AppData/Local/Temp/claude/C--Users-Marti-OneDrive-Documentos-Informes-Clima/1a28f6b6-51b8-42c4-9712-693cad4f171d/scratchpad/ruler.html)",
-      "Bash(git rev-list *)"
+      "Bash(git rev-list *)",
+      "Bash(where.exe soffice *)",
+      "Read(//c/Program Files/LibreOffice/program/**)",
+      "Bash(node *)",
+      "Bash(PORT=3211 node *)"
     ]
   }
 }
