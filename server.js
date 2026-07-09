@@ -36,6 +36,10 @@ if (supabase) {
 }
 
 const app = express();
+// Render corre la app detrás de un único reverse proxy: sin esto, Express
+// no confía en X-Forwarded-For y express-rate-limit no puede identificar
+// la IP real del cliente (todos comparten el límite de tasa del proxy).
+app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: false })); // CSP off: HTML usa scripts inline
 
 const PORT = process.env.PORT || 3000;
@@ -843,6 +847,22 @@ app.get('/test-insert', heavyLimiter, async (req, res) => {
   const { data, error: selectError } = await supabase.from('informes_clima').select('*').eq('id', testId).single();
   if (selectError) return res.json({ ok: false, paso: 'select', error: selectError.message });
   await supabase.from('informes_clima').delete().eq('id', testId);
+  res.json({ ok: true, mensaje: 'Insert y select funcionan correctamente', registro: data });
+});
+
+app.get('/test-insert-wom', heavyLimiter, async (req, res) => {
+  if (!supabase) return res.json({ ok: false, error: 'Supabase no configurado' });
+  const testId = 'test-' + Date.now();
+  const { error: insertError } = await supabase.from('informes_wom').insert({
+    id: testId, fecha_creacion: new Date().toISOString(),
+    ticket: 'TEST-001', cod_interno: 'TEST', fecha_inicio: '2026-01-01',
+    instalacion: 'Sitio Test', tipo_actividad: 'Test', tecnicos: 'Test',
+    photo_count: 0, filename: 'test.docx'
+  });
+  if (insertError) return res.json({ ok: false, paso: 'insert', error: insertError.message, hint: insertError.hint, details: insertError.details });
+  const { data, error: selectError } = await supabase.from('informes_wom').select('*').eq('id', testId).single();
+  if (selectError) return res.json({ ok: false, paso: 'select', error: selectError.message });
+  await supabase.from('informes_wom').delete().eq('id', testId);
   res.json({ ok: true, mensaje: 'Insert y select funcionan correctamente', registro: data });
 });
 
