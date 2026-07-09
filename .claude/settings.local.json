@@ -75,7 +75,18 @@
       "Bash(where.exe soffice *)",
       "Read(//c/Program Files/LibreOffice/program/**)",
       "Bash(node *)",
-      "Bash(PORT=3211 node *)"
+      "Bash(PORT=3211 node *)",
+      "Bash(git -C \"/c/Users/Marti/OneDrive/Documentos/INFORMECORRECTIVOS\" remote -v)",
+      "Bash(git -C \"/c/Users/Marti/OneDrive/Documentos/INFORMECORRECTIVOS\" log --oneline -5)",
+      "Bash(git -C C:/Users/Marti/AppData/Local/Temp/claude/C--Users-Marti-OneDrive-Documentos-Informes-Clima/909a38f9-53f2-4d00-8c73-dcde0639edb1/scratchpad/GESTIONTECNICA log --oneline -10)",
+      "Bash(git -C C:/Users/Marti/AppData/Local/Temp/claude/C--Users-Marti-OneDrive-Documentos-Informes-Clima/909a38f9-53f2-4d00-8c73-dcde0639edb1/scratchpad/GESTIONTECNICA log --oneline HEAD..base/main)",
+      "Bash(git -C C:/Users/Marti/AppData/Local/Temp/claude/C--Users-Marti-OneDrive-Documentos-Informes-Clima/909a38f9-53f2-4d00-8c73-dcde0639edb1/scratchpad/GESTIONTECNICA log --oneline -1 a1f4995381611e35e5cd2f4df2a91e0991dc3098)",
+      "Bash(PORT=3212 node server.js)",
+      "Bash(npm view *)",
+      "Bash(chromium-cli --help)",
+      "Bash(npx --yes playwright --version)",
+      "Bash(npx --yes playwright install chromium)",
+      "Bash(npm init *)"
     ]
   }
 }

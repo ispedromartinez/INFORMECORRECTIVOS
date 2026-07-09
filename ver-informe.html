@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Vista previa del informe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--blue:#0073EA;--bg:#F6F7FB;--text:#323338;--muted:#676879;--red:#E2445C;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Poppins',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;min-height:100dvh;}
+
+header{position:sticky;top:0;z-index:10;background:#1C1F3B;color:#fff;
+  padding:10px 16px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  box-shadow:0 2px 12px rgba(0,0,0,.2);border-bottom:3px solid var(--blue);}
+.hdr-left{display:flex;align-items:center;gap:10px;min-width:0;}
+.hdr-logo{height:26px;object-fit:contain;background:#fff;border-radius:6px;padding:3px 8px;flex-shrink:0;display:block;}
+.hdr-title{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hdr-actions{display:flex;gap:8px;flex-shrink:0;}
+.hdr-btn{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#fff;text-decoration:none;
+  background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:7px 11px;cursor:pointer;
+  transition:background .15s,border-color .15s;}
+.hdr-btn:hover{background:rgba(255,255,255,.24);border-color:rgba(255,255,255,.4);}
+
+main{max-width:900px;margin:0 auto;padding:20px 12px 48px;}
+
+#state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:70px 20px;text-align:center;color:var(--muted);font-size:13px;}
+.spinner{width:34px;height:34px;border:3px solid #D9E2F3;border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+#state.error{color:var(--red);}
+#state .retry{margin-top:4px;background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:12px;font-weight:600;cursor:pointer;}
+
+#viewer{display:none;}
+#viewer .docx-wrapper{background:transparent!important;padding:0!important;display:flex!important;flex-direction:column;align-items:center;gap:20px;}
+#viewer .docx-wrapper>section.docx{box-shadow:0 1px 4px rgba(0,0,0,.08),0 8px 24px rgba(0,0,0,.12)!important;margin:0!important;}
+
+@media (prefers-reduced-motion:reduce){.spinner{animation:none;border-top-color:#D9E2F3;}}
+</style>
+</head>
+<body>
+<header>
+  <div class="hdr-left">
+    <img class="hdr-logo" id="hdrLogo" src="/tigo-logo.png" alt="">
+    <div class="hdr-title" id="hdrTitle">Vista previa del informe</div>
+  </div>
+  <div class="hdr-actions">
+    <a class="hdr-btn" id="btnDescargar" href="#">⬇ Descargar</a>
+    <button class="hdr-btn" onclick="window.close()">✕ Cerrar</button>
+  </div>
+</header>
+<main>
+  <div id="state">
+    <div class="spinner"></div>
+    <div id="stateMsg">Cargando vista previa…</div>
+  </div>
+  <div id="viewer"></div>
+</main>
+
+<script src="/vendor/jszip.min.js"></script>
+<script src="/vendor/docx-preview.min.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const id = params.get('id');
+const tipo = params.get('tipo') === 'wom' ? 'wom' : 'clima';
+const descargarUrl = tipo === 'wom' ? `/descargar-wom/${id}` : `/descargar/${id}`;
+
+if (tipo === 'wom') document.getElementById('hdrLogo').src = '/wom-logo.png';
+document.getElementById('btnDescargar').href = descargarUrl;
+
+const stateEl = document.getElementById('state');
+const viewerEl = document.getElementById('viewer');
+
+function showError(msg){
+  stateEl.classList.add('error');
+  stateEl.innerHTML = `<div style="font-size:24px">⚠️</div><div>${msg}</div><button class="retry" onclick="location.reload()">Reintentar</button>`;
+}
+
+// docx-preview posiciona el <article> (cuerpo) a la distancia fija del margen
+// superior del documento, sin importar la altura real del <header>: si el
+// header ocupa más espacio que el reservado, queda tapado por el cuerpo.
+// Word/LibreOffice sí reacomodan el cuerpo; docx-preview no, así que lo
+// corregimos a mano tras renderizar.
+function corregirSolapeHeader(){
+  viewerEl.querySelectorAll('section.docx').forEach(section => {
+    const header = section.querySelector(':scope > header');
+    const article = section.querySelector(':scope > article');
+    if (!header || !article) return;
+    const overlap = header.getBoundingClientRect().bottom - article.getBoundingClientRect().top;
+    if (overlap > 0) article.style.marginTop = overlap + 'px';
+  });
+}
+
+// Escala las páginas para que quepan en pantallas angostas (móvil) sin scroll horizontal
+function ajustarEscala(){
+  const wrapper = viewerEl.querySelector('.docx-wrapper');
+  const pagina  = viewerEl.querySelector('.docx-wrapper>section.docx');
+  if (!wrapper || !pagina) return;
+  const disponible = viewerEl.clientWidth;
+  const escala = Math.min(1, disponible / pagina.offsetWidth);
+  wrapper.style.transformOrigin = 'top center';
+  wrapper.style.transform = escala < 1 ? `scale(${escala})` : '';
+  viewerEl.style.height = escala < 1 ? (wrapper.scrollHeight * escala) + 'px' : '';
+}
+window.addEventListener('resize', () => { if (viewerEl.style.display === 'block') ajustarEscala(); });
+
+async function cargar(){
+  if (!id) { showError('Falta el identificador del informe.'); return; }
+  try {
+    const resp = await fetch(descargarUrl);
+    if (!resp.ok) {
+      throw new Error(resp.status === 404 ? 'No se encontró el informe.' : `Error del servidor (${resp.status}).`);
+    }
+    const blob = await resp.blob();
+    await docx.renderAsync(blob, viewerEl, undefined, {
+      className: 'docx', inWrapper: true, breakPages: true,
+      experimental: true, renderHeaders: true, renderFooters: true, renderFootnotes: true
+    });
+    corregirSolapeHeader();
+    viewerEl.style.display = 'block';
+    stateEl.style.display = 'none';
+    // Esperar a que el navegador termine el layout (tablas con ancho automático,
+    // fuentes) antes de medir alturas reales del header/artículo y escalar.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      corregirSolapeHeader();
+      ajustarEscala();
+    }));
+  } catch (err) {
+    console.error(err);
+    showError(err.message || 'No se pudo generar la vista previa. Puedes descargar el archivo con el botón de arriba.');
+  }
+}
+
+cargar();
+</script>
+</body>
+</html>

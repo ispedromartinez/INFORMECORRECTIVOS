@@ -748,7 +748,7 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
   </div>
   <div style="padding:4px 0 20px">
     <button class="btn-gen" id="btnDocx" onclick="generateDocx()">⬇ Descargar Informe Word (.docx)</button>
-    <button class="btn btn-secondary" id="btnVerPdf" onclick="verInformePdf()" style="display:none;width:100%;margin-top:8px">👁 Ver Informe (PDF)</button>
+    <button class="btn btn-secondary" id="btnVerPdf" onclick="verInformePdf()" style="display:none;width:100%;margin-top:8px">👁 Ver Informe</button>
     <div class="status" id="statusMsg"></div>
   </div>
 </div>
@@ -1795,7 +1795,7 @@ async function generateDocx(){
 
 function verInformePdf(){
   if(!lastInformeId)return;
-  window.open(`${SERVER}/ver-pdf/${lastInformeId}`,'_blank');
+  window.open(`${SERVER}/ver-informe.html?tipo=clima&id=${lastInformeId}`,'_blank');
 }
 
 // ══ OVERLAY DE GENERACIÓN ══
@@ -1989,7 +1989,7 @@ function renderHist(records){
 }
 function toggleInf(id){document.getElementById(`body_${id}`).classList.toggle('open');}
 async function downloadRecord(id){const a=document.createElement('a');a.href=`${SERVER}/descargar/${id}`;a.click();}
-function verInformePdfRecord(id){window.open(`${SERVER}/ver-pdf/${id}`,'_blank');}
+function verInformePdfRecord(id){window.open(`${SERVER}/ver-informe.html?tipo=clima&id=${id}`,'_blank');}
 function openConfirm(id,sitio){pendingDeleteId=id;document.getElementById('confirmMsg').textContent=`Se eliminará el informe de "${sitio}". Esta acción no se puede deshacer.`;document.getElementById('confirmDel').classList.add('open');}
 function closeConfirm(){document.getElementById('confirmDel').classList.remove('open');pendingDeleteId=null;}
 async function confirmDelete(){if(!pendingDeleteId)return;closeConfirm();try{await fetch(`${SERVER}/registro/${pendingDeleteId}`,{method:'DELETE'});await loadHist();}catch(e){alert('Error: '+e.message);}}

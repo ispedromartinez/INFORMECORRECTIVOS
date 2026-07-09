@@ -602,7 +602,7 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
       Generar Informe WOM
     </button>
   </div>
-  <button class="btn btn-secondary" id="btn-ver-pdf-wom" onclick="verInformePdfWom()" style="display:none;width:100%;margin-top:8px">👁 Ver Informe (PDF)</button>
+  <button class="btn btn-secondary" id="btn-ver-pdf-wom" onclick="verInformePdfWom()" style="display:none;width:100%;margin-top:8px">👁 Ver Informe</button>
 </div>
 
 <!-- ══════════ PANEL 4: HISTORIAL ══════════ -->
@@ -1155,7 +1155,7 @@ async function generarInforme() {
 
 function verInformePdfWom() {
   if (!lastInformeIdWom) return;
-  window.open(`/ver-pdf-wom/${lastInformeIdWom}`, '_blank');
+  window.open(`/ver-informe.html?tipo=wom&id=${lastInformeIdWom}`, '_blank');
 }
 
 // ── Historial ─────────────────────────────────────────────────
@@ -1294,7 +1294,7 @@ async function descargar(id) {
 }
 
 function verInformePdfRecord(id) {
-  window.open(`/ver-pdf-wom/${id}`, '_blank');
+  window.open(`/ver-informe.html?tipo=wom&id=${id}`, '_blank');
 }
 
 async function eliminar(id, btn) {
