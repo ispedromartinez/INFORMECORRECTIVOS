@@ -866,6 +866,18 @@ app.get('/test-insert-wom', heavyLimiter, async (req, res) => {
   res.json({ ok: true, mensaje: 'Insert y select funcionan correctamente', registro: data });
 });
 
+app.get('/test-storage', heavyLimiter, async (req, res) => {
+  if (!supabase) return res.json({ ok: false, error: 'Supabase no configurado' });
+  const testPath = `test/${Date.now()}.txt`;
+  const { error: uploadError } = await supabase.storage.from(SUPABASE_BUCKET)
+    .upload(testPath, Buffer.from('test'), { contentType: 'text/plain', upsert: true });
+  if (uploadError) return res.json({ ok: false, paso: 'upload', bucket: SUPABASE_BUCKET, error: uploadError.message });
+  const { data, error: downloadError } = await supabase.storage.from(SUPABASE_BUCKET).download(testPath);
+  if (downloadError || !data) return res.json({ ok: false, paso: 'download', bucket: SUPABASE_BUCKET, error: downloadError?.message });
+  await supabase.storage.from(SUPABASE_BUCKET).remove([testPath]);
+  res.json({ ok: true, mensaje: 'Upload y download del bucket funcionan correctamente', bucket: SUPABASE_BUCKET });
+});
+
 app.get('/version', (req,res) => {
   try {
     const mtime = fs.statSync(path.join(__dirname, 'informe_clima_app.html')).mtimeMs;
