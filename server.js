@@ -1249,6 +1249,13 @@ async function buildDocxWom(d) {
   const tblBrd  = { top:thin(), bottom:thin(), left:thin(), right:thin(), insideH:thin(), insideV:thin() };
   const noBrd   = { top:noneB, bottom:noneB, left:noneB, right:noneB };
   const noTblBrd= { top:noneB, bottom:noneB, left:noneB, right:noneB, insideH:noneB, insideV:noneB };
+  // La mini-tabla OT va anidada dentro de una celda del header con otra celda
+  // (logos) más alta a su lado: docx-preview estira el borde izquierdo de la
+  // tabla anidada hasta el alto de la fila completa. Sin borde izquierdo aquí
+  // evita esa línea larga; el resto de tablas del cuerpo no están anidadas y sí
+  // llevan los 4 bordes.
+  const otBrd    = { top:thin(), bottom:thin(), left:noneB, right:thin() };
+  const otTblBrdX= { top:thin(), bottom:thin(), left:noneB, right:thin(), insideH:thin(), insideV:thin() };
 
   // ── Helpers ──────────────────────────────────────────────
   const para = (children, align='left', before=0) => new Paragraph({
@@ -1263,20 +1270,20 @@ async function buildDocxWom(d) {
 
   // Celda OT (texto centrado, sin relleno)
   const otCell = (text, w, opts={}) => new TableCell({
-    width:{size:w,type:WidthType.DXA}, borders:brd,
+    width:{size:w,type:WidthType.DXA}, borders:otBrd,
     verticalAlign:VerticalAlign.CENTER, margins:{top:40,bottom:40,left:14,right:14},
     children:[para(run(text,opts),'center',110)]
   });
   // Celda OT azul (ORDEN DE TRABAJO / Fecha OT)
   const otBlu = (text, w, span, sz) => new TableCell({
     width:{size:w,type:WidthType.DXA}, ...(span>1?{columnSpan:span}:{}),
-    borders:brd, shading:{fill:BLU,type:ShadingType.CLEAR},
+    borders:otBrd, shading:{fill:BLU,type:ShadingType.CLEAR},
     verticalAlign:VerticalAlign.CENTER, margins:{top:40,bottom:40,left:60,right:60},
     children:[para(run(text,{bold:true,sz,c:WHT}),'center',sz===30?284:110)]
   });
   // Celda código interno verde centrada
   const otCod = (codVal, w) => new TableCell({
-    width:{size:w,type:WidthType.DXA}, borders:brd,
+    width:{size:w,type:WidthType.DXA}, borders:otBrd,
     verticalAlign:VerticalAlign.CENTER, margins:{top:40,bottom:40,left:14,right:14},
     children:[para(codVal
       ? run(`INC-${codVal}`,{bold:true,c:GRN,sz:18})
@@ -1284,24 +1291,27 @@ async function buildDocxWom(d) {
     'center',110)]
   });
 
-  // Mini-tabla ORDEN DE TRABAJO — usa tblBrd (ya sin borde izquierdo)
-  const otTblBrd = tblBrd;
+  // Mini-tabla ORDEN DE TRABAJO — anidada, sin borde izquierdo (ver otBrd)
+  const otTblBrd = otTblBrdX;
   const otTable = new Table({
     width:{size:HDR_R,type:WidthType.DXA}, columnWidths:[OT_COL,OT_COL], borders:otTblBrd,
     indent:{size:0,type:WidthType.DXA},
     rows:[
-      new TableRow({height:{value:558},children:[otBlu('ORDEN DE TRABAJO',OT_COL*2,2,30)]}),
-      new TableRow({height:{value:404},children:[
+      // Alturas escaladas para que el total (4275) iguale el alto de la celda
+      // de logos (ICETEL 2625 + WOM 1530 + margenes 80): sin eso queda un
+      // hueco vacio bajo la tabla OT donde docx-preview dibuja una linea fantasma.
+      new TableRow({height:{value:940},children:[otBlu('ORDEN DE TRABAJO',OT_COL*2,2,30)]}),
+      new TableRow({height:{value:680},children:[
         otCell('Código Interno',OT_COL), otCod(v(d.codInterno),OT_COL)
       ]}),
-      new TableRow({height:{value:404},children:[
+      new TableRow({height:{value:680},children:[
         otCell('Ticket',OT_COL), otCell(v(d.ticket),OT_COL,{bold:true})
       ]}),
-      new TableRow({height:{value:404},children:[otBlu('Fecha OT',OT_COL*2,2,18)]}),
-      new TableRow({height:{value:393},children:[
+      new TableRow({height:{value:680},children:[otBlu('Fecha OT',OT_COL*2,2,18)]}),
+      new TableRow({height:{value:660},children:[
         otCell('Inicio:',OT_COL), otCell(`${v(d.fechaInicio)}  ${v(d.horaInicio)}`,OT_COL)
       ]}),
-      new TableRow({height:{value:371},children:[
+      new TableRow({height:{value:635},children:[
         otCell('Término:',OT_COL), otCell(`${v(d.fechaTermino)}  ${v(d.horaTermino)}`,OT_COL)
       ]})
     ]
