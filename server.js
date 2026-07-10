@@ -1245,9 +1245,8 @@ async function buildDocxWom(d) {
   // ── Bordes ───────────────────────────────────────────────
   const thin    = () => ({ style: BorderStyle.SINGLE, size: 4, color: 'auto' });
   const noneB   = { style: BorderStyle.NONE, size: 0, color: 'auto' };
-  // Sin borde izquierdo: evita la línea vertical en el margen izquierdo
-  const brd     = { top:thin(), bottom:thin(), left:noneB, right:thin() };
-  const tblBrd  = { top:thin(), bottom:thin(), left:noneB, right:thin(), insideH:thin(), insideV:thin() };
+  const brd     = { top:thin(), bottom:thin(), left:thin(), right:thin() };
+  const tblBrd  = { top:thin(), bottom:thin(), left:thin(), right:thin(), insideH:thin(), insideV:thin() };
   const noBrd   = { top:noneB, bottom:noneB, left:noneB, right:noneB };
   const noTblBrd= { top:noneB, bottom:noneB, left:noneB, right:noneB, insideH:noneB, insideV:noneB };
 
@@ -1408,9 +1407,9 @@ async function buildDocxWom(d) {
 
   // ── TABLE 5: Separador vacío ──────────────────────────────
   const emptyTable = new Table({
-    width:{size:FULL_W,type:WidthType.DXA}, columnWidths:[FULL_W], borders:tblBrd,
+    width:{size:FULL_W,type:WidthType.DXA}, columnWidths:[FULL_W], borders:noTblBrd,
     rows:[new TableRow({height:{value:150},children:[
-      new TableCell({width:{size:FULL_W,type:WidthType.DXA},borders:brd,children:[para(run(''))]})
+      new TableCell({width:{size:FULL_W,type:WidthType.DXA},borders:noBrd,children:[para(run(''))]})
     ]})]
   });
 
