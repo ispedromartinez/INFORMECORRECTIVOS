@@ -4,6 +4,7 @@ const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 const path = require('path');
 const XLSXStyle = require('xlsx-js-style');
 const nodemailer = require('nodemailer');
@@ -800,9 +801,28 @@ async function autoEnviarInforme({ buffer, filename, subject, text }) {
 // ── Routes ────────────────────────────────────────────────
 app.get('/ping', (req,res) => res.json({ok:true}));
 
+// Los endpoints de diagnóstico ejecutan operaciones reales con las claves del
+// servidor (escriben en Supabase, suben al bucket, consumen cuota de Brevo).
+// En un deploy público cualquiera con la URL podría abusar de ellos, así que
+// exigen ADMIN_TOKEN. Sin ADMIN_TOKEN definido quedan deshabilitados en vez de
+// abiertos: un despliegue sin configurar no debe exponerlos por omisión.
+const ADMIN_TOKEN = (process.env.ADMIN_TOKEN || '').trim();
+function requireAdmin(req, res, next) {
+  if (!ADMIN_TOKEN) {
+    return res.status(404).json({ ok: false, error: 'Diagnóstico deshabilitado: define ADMIN_TOKEN para habilitarlo.' });
+  }
+  const supplied = (req.get('x-admin-token') || req.query.token || '').trim();
+  // Comparación de longitud fija para no filtrar el token por tiempo de respuesta.
+  const a = Buffer.from(supplied), b = Buffer.from(ADMIN_TOKEN);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(401).json({ ok: false, error: 'No autorizado.' });
+  }
+  next();
+}
+
 // Prueba de configuración de correo: envía un email de test a MAIL_TO.
 // Uso: abrir /probar-correo en el navegador. Devuelve el resultado real.
-app.get('/probar-correo', heavyLimiter, async (req, res) => {
+app.get('/probar-correo', heavyLimiter, requireAdmin, async (req, res) => {
   const via = BREVO_API_KEY ? 'API Brevo (HTTPS)' : `SMTP ${MAIL_HOST}:${MAIL_PORT}`;
   if (!mailConfigured()) {
     return res.json({ ok: false, error: 'Correo desactivado: define BREVO_API_KEY (recomendado en Render) o MAIL_USER/MAIL_PASS.' });
@@ -827,14 +847,14 @@ app.get('/probar-correo', heavyLimiter, async (req, res) => {
   }
 });
 
-app.get('/ping-supabase', async (req, res) => {
+app.get('/ping-supabase', heavyLimiter, requireAdmin, async (req, res) => {
   if (!supabase) return res.json({ ok: false, error: 'SUPABASE_URL o SUPABASE_KEY no configuradas' });
   const { error } = await supabase.from('informes_clima').select('id').limit(1);
   if (error) return res.json({ ok: false, error: error.message });
   res.json({ ok: true, bucket: SUPABASE_BUCKET });
 });
 
-app.get('/test-insert', heavyLimiter, async (req, res) => {
+app.get('/test-insert', heavyLimiter, requireAdmin, async (req, res) => {
   if (!supabase) return res.json({ ok: false, error: 'Supabase no configurado' });
   const testId = 'test-' + Date.now();
   const { error: insertError } = await supabase.from('informes_clima').insert({
@@ -850,7 +870,7 @@ app.get('/test-insert', heavyLimiter, async (req, res) => {
   res.json({ ok: true, mensaje: 'Insert y select funcionan correctamente', registro: data });
 });
 
-app.get('/test-insert-wom', heavyLimiter, async (req, res) => {
+app.get('/test-insert-wom', heavyLimiter, requireAdmin, async (req, res) => {
   if (!supabase) return res.json({ ok: false, error: 'Supabase no configurado' });
   const testId = 'test-' + Date.now();
   const { error: insertError } = await supabase.from('informes_wom').insert({
@@ -866,7 +886,7 @@ app.get('/test-insert-wom', heavyLimiter, async (req, res) => {
   res.json({ ok: true, mensaje: 'Insert y select funcionan correctamente', registro: data });
 });
 
-app.get('/test-storage', heavyLimiter, async (req, res) => {
+app.get('/test-storage', heavyLimiter, requireAdmin, async (req, res) => {
   if (!supabase) return res.json({ ok: false, error: 'Supabase no configurado' });
   const testPath = `test/${Date.now()}.txt`;
   const { error: uploadError } = await supabase.storage.from(SUPABASE_BUCKET)
