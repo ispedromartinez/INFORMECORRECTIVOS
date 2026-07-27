@@ -1079,24 +1079,9 @@ app.get('/descargar/:id', async (req,res) => {
   res.send(buffer);
 });
 
-app.post('/enviar/:id', heavyLimiter, async (req,res) => {
-  const entry = await dbClimaFind(req.params.id);
-  if (!entry) return res.status(404).json({error:'No encontrado'});
-  let buffer = await storageDownload(`clima/${entry.filename}`);
-  if (!buffer) {
-    const fpath = path.join(DOCS_DIR, entry.filename);
-    if (!fs.existsSync(fpath)) return res.status(404).json({error:'Archivo no existe'});
-    buffer = fs.readFileSync(fpath);
-  }
-  const { to } = req.body;
-  if (!to) return res.status(400).json({error:'Email requerido'});
-  try {
-    await sendEmail({ to, subject:`Informe - ${entry.nombreSitio} - ${entry.codInforme}`,
-      text:`Adjunto informe.\nSitio: ${entry.nombreSitio}\nFecha: ${entry.fecha}\nTécnico: ${entry.tecnico}`,
-      filename: entry.filename, buffer });
-    res.json({ok:true});
-  } catch(err){ res.status(500).json({error:err.message}); }
-});
+// El endpoint POST /enviar/:id se eliminó: la UI ya no ofrece envío manual y
+// aceptaba cualquier destinatario, lo que permitía usar la cuenta de correo
+// (Brevo) para spam. El auto-envío a MAIL_TO en /generar sigue vigente.
 
 // Mover a papelera (soft delete)
 app.delete('/registro/:id', async (req,res) => {

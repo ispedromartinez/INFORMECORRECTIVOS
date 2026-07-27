@@ -826,16 +826,6 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
 </div>
 
 <!-- EMAIL MODAL -->
-<div class="modal-overlay" id="emailModal">
-  <div class="modal-box">
-    <div class="modal-title">✉️ Enviar por correo<button class="modal-close" onclick="closeEmailModal()">✕</button></div>
-    <div class="modal-info" id="emailModalInfo">—</div>
-    <div class="field"><label>Destinatario</label><input type="email" id="emailTo" placeholder="correo@empresa.com"></div>
-    <button class="btn-gen" style="font-size:14px;padding:13px" onclick="sendEmail()">📤 Enviar</button>
-    <div class="status" id="emailStatus"></div>
-  </div>
-</div>
-
 <!-- REPORTE MODAL -->
 <div class="modal-overlay centered" id="reporteModal">
   <div class="modal-box rep-modal" style="max-width:460px;max-height:88vh;overflow-y:auto;">
@@ -910,7 +900,7 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
 
 <script>
 const SERVER=window.location.origin;
-let serverOnline=false, allRecords=[], pendingDeleteId=null, pendingEmailId=null, lastInformeId=null;
+let serverOnline=false, allRecords=[], pendingDeleteId=null, lastInformeId=null;
 
 // ══ SUPERVISORS list ══
 const SUPERVISORS=[
@@ -2021,20 +2011,6 @@ function verInformePdfRecord(id){window.open(`${SERVER}/ver-informe.html?tipo=cl
 function openConfirm(id){pendingDeleteId=id;const sitio=(allRecords.find(x=>x.id===id)||{}).nombreSitio||'';document.getElementById('confirmMsg').textContent=`Se eliminará el informe de "${sitio}". Esta acción no se puede deshacer.`;document.getElementById('confirmDel').classList.add('open');}
 function closeConfirm(){document.getElementById('confirmDel').classList.remove('open');pendingDeleteId=null;}
 async function confirmDelete(){if(!pendingDeleteId)return;closeConfirm();try{await fetch(`${SERVER}/registro/${pendingDeleteId}`,{method:'DELETE'});await loadHist();}catch(e){alert('Error: '+e.message);}}
-function openEmailModal(id,sitio,cod){pendingEmailId=id;document.getElementById('emailModalInfo').textContent=`Informe: ${cod} — Sitio: ${sitio}`;document.getElementById('emailStatus').style.display='none';document.getElementById('emailModal').classList.add('open');}
-function closeEmailModal(){document.getElementById('emailModal').classList.remove('open');pendingEmailId=null;}
-async function sendEmail(){
-  const st=document.getElementById('emailStatus');const to=document.getElementById('emailTo').value.trim();
-  st.style.display='';
-  if(!to){st.className='status err';st.textContent='⚠ Ingresa un correo destinatario.';return;}
-  st.className='status loading';st.textContent='📤 Enviando...';
-  try{
-    const r=await fetch(`${SERVER}/enviar/${pendingEmailId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to})});
-    const d=await r.json();if(!r.ok)throw new Error(d.error||'Error al enviar');
-    st.className='status ok';st.textContent='✅ Informe enviado correctamente';setTimeout(closeEmailModal,2000);
-  }catch(e){st.className='status err';st.textContent='❌ '+e.message;}
-}
-document.getElementById('emailModal').addEventListener('click',function(e){if(e.target===this)closeEmailModal();});
 document.getElementById('confirmDel').addEventListener('click',function(e){if(e.target===this)closeConfirm();});
 
 // ══ PAPELERA ══
