@@ -83,7 +83,18 @@ const heavyLimiter = rateLimit({
 });
 
 app.use(generalLimiter);
-app.use(express.json({ limit: '80mb' }));
+// 20 MB tope. Las fotos se comprimen en el cliente (máx 1600px, JPEG 0.8)
+// antes de enviarse, así que 12 fotos entran holgadas y se acota el uso de
+// RAM del proceso (Render free) ante payloads abusivos.
+app.use(express.json({ limit: '20mb' }));
+// Cuerpo demasiado grande: responder JSON 413 en vez de que Express lo
+// convierta en un 500 genérico.
+app.use((err, req, res, next) => {
+  if (err && (err.type === 'entity.too.large' || err.status === 413)) {
+    return res.status(413).json({ error: 'El informe supera el máximo de 20 MB. Reduce la cantidad o el tamaño de las fotos.' });
+  }
+  next(err);
+});
 // Solo los assets que usan las páginas. Antes se servía todo __dirname con
 // express.static: exponía server.js, registro.json y los .docx de informes/,
 // y la carpeta física papelera/ tapaba la ruta GET /papelera con un redirect.

@@ -1565,22 +1565,31 @@ function rotatePhoto(idx,e){
   t.rot=((t.rot||0)+90)%360;
   applyTransform(idx);
 }
+// Comprime SIEMPRE: redimensiona a máx PHOTO_MAX_DIM px (lado largo) y
+// re-codifica JPEG PHOTO_JPEG_Q. Reduce el peso del payload antes de subir
+// (una foto de celular pasa de varios MB a ~100-300 KB). Aplica también la
+// rotación en el mismo lienzo.
+const PHOTO_MAX_DIM=1600, PHOTO_JPEG_Q=0.8;
 function getRotatedDataUrl(idx){
   const url=photoDataUrls[idx];if(!url)return null;
-  const t=photoTransforms[idx];
-  const rot=((t&&t.rot)||0)%360;
-  if(!rot)return url;
   const img=document.getElementById(`img${idx}`);
   if(!img||!img.naturalWidth)return url;
-  const iW=img.naturalWidth,iH=img.naturalHeight;
+  const t=photoTransforms[idx];
+  const rot=((t&&t.rot)||0)%360;
   const swap=(rot===90||rot===270);
+  const iW=img.naturalWidth,iH=img.naturalHeight;
+  const dW=swap?iH:iW,dH=swap?iW:iH;              // dimensiones tras rotar
+  const longest=Math.max(dW,dH);
+  const scale=longest>PHOTO_MAX_DIM?PHOTO_MAX_DIM/longest:1;
+  const cW=Math.round(dW*scale),cH=Math.round(dH*scale);
   const canvas=document.createElement('canvas');
-  canvas.width=swap?iH:iW;canvas.height=swap?iW:iH;
+  canvas.width=cW;canvas.height=cH;
   const ctx=canvas.getContext('2d');
-  ctx.translate(canvas.width/2,canvas.height/2);
+  ctx.imageSmoothingQuality='high';
+  ctx.translate(cW/2,cH/2);
   ctx.rotate(rot*Math.PI/180);
-  ctx.drawImage(img,-iW/2,-iH/2,iW,iH);
-  try{return canvas.toDataURL('image/jpeg',0.92);}
+  ctx.drawImage(img,-iW*scale/2,-iH*scale/2,iW*scale,iH*scale);
+  try{return canvas.toDataURL('image/jpeg',PHOTO_JPEG_Q);}
   catch(e){return url;}
 }
 function setupPhotoInteraction(idx){
@@ -1777,7 +1786,7 @@ async function generateDocx(){
   };
   try{
     const resp=await fetch(SERVER+'/generar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    if(!resp.ok)throw new Error(`Error del servidor: ${resp.status}`);
+    if(!resp.ok){let msg=`Error del servidor: ${resp.status}`;try{const j=await resp.json();if(j&&j.error)msg=j.error;}catch{}throw new Error(msg);}
     const blob=await resp.blob();
     const disp=resp.headers.get('Content-Disposition')||'';
     const fnMatch=disp.match(/filename="(.+)"/);
