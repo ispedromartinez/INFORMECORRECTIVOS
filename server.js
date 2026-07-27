@@ -50,6 +50,10 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
+      // Los botones de la app usan handlers inline (onclick="..."). Helmet
+      // pone script-src-attr 'none' por defecto, lo que los deja muertos sin
+      // dar error visible. No debilita nada extra: script-src ya es unsafe-inline.
+      scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       fontSrc: ["'self'", 'https://fonts.gstatic.com'],
       imgSrc: ["'self'", 'data:', 'blob:'],
