@@ -480,6 +480,22 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
 </head>
 <body>
 
+<!-- ══ LOGIN GATE ══ -->
+<div id="loginGate" style="display:none;position:fixed;inset:0;z-index:99999;background:#0f172a;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:16px;padding:30px 26px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.4);">
+    <div style="text-align:center;font-size:20px;font-weight:800;color:#1e293b;margin-bottom:6px;">🔒 Iniciar sesión</div>
+    <div style="text-align:center;font-size:13px;color:#64748b;margin-bottom:20px;">Informes Correctivos ICETEL</div>
+    <form id="loginForm" autocomplete="on">
+      <label style="display:block;font-size:12px;font-weight:700;color:#334155;margin-bottom:5px;">Usuario</label>
+      <input type="email" id="loginUser" autocomplete="username" placeholder="correo@dominio.cl" style="width:100%;box-sizing:border-box;padding:12px;border:1.5px solid #cbd5e1;border-radius:9px;font-size:15px;margin-bottom:14px;" required>
+      <label style="display:block;font-size:12px;font-weight:700;color:#334155;margin-bottom:5px;">Clave</label>
+      <input type="password" id="loginPass" autocomplete="current-password" placeholder="••••••••" style="width:100%;box-sizing:border-box;padding:12px;border:1.5px solid #cbd5e1;border-radius:9px;font-size:15px;margin-bottom:18px;" required>
+      <button type="submit" id="loginBtn" style="width:100%;padding:13px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Entrar</button>
+      <div id="loginErr" style="display:none;margin-top:12px;padding:10px;border-radius:8px;background:#fef2f2;color:#b91c1c;font-size:13px;text-align:center;"></div>
+    </form>
+  </div>
+</div>
+
 <div class="top-sticky">
 <header>
   <div class="hdr-inner">
@@ -1951,6 +1967,10 @@ async function generarReporte(){
   }catch(err){alert('Error: '+err.message);}
   finally{btn.disabled=false;}
 }
+// Escapa datos del registro antes de meterlos en innerHTML. Evita XSS
+// almacenado: un informe con HTML en el nombre del sitio, técnico, etc. no
+// debe ejecutar nada al listarlo.
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function renderHist(records){
   const now=new Date();
   const thisMonth=records.filter(r=>{if(!r.fechaCreacion)return false;const d=new Date(r.fechaCreacion);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();}).length;
@@ -1972,24 +1992,24 @@ function renderHist(records){
       <div class="inf-head" onclick="toggleInf('${r.id}')">
         <div class="inf-icon">📄</div>
         <div class="inf-meta">
-          <div class="inf-sitio">${r.nombreSitio||'Sin sitio'}</div>
-          <div class="inf-cod">${r.codInforme||'—'}</div>
-          <div class="inf-sub">Técnico: ${r.tecnico||'—'} · OT: ${r.numOT||'—'}</div>
+          <div class="inf-sitio">${esc(r.nombreSitio||'Sin sitio')}</div>
+          <div class="inf-cod">${esc(r.codInforme||'—')}</div>
+          <div class="inf-sub">Técnico: ${esc(r.tecnico||'—')} · OT: ${esc(r.numOT||'—')}</div>
           <span class="inf-badge">📷 ${photos} foto${photos!==1?'s':''}</span>
         </div>
         <div style="font-size:10px;color:var(--muted);text-align:right;flex-shrink:0">${dateStr.replace(',','<br>')}</div>
       </div>
       <div class="inf-body" id="body_${r.id}">
         <div class="inf-detail-grid">
-          <div class="id-row"><div class="id-lbl">Fecha Ejecución</div><div class="id-val">${r.fecha||'—'}</div></div>
-          <div class="id-row"><div class="id-lbl">Código Sitio</div><div class="id-val">${r.codigoSitio||'—'}</div></div>
-          <div class="id-row"><div class="id-lbl">Equipo</div><div class="id-val">${r.equipo||'—'}</div></div>
-          <div class="id-row"><div class="id-lbl">Circuito</div><div class="id-val">${r.circuito||'—'}</div></div>
+          <div class="id-row"><div class="id-lbl">Fecha Ejecución</div><div class="id-val">${esc(r.fecha||'—')}</div></div>
+          <div class="id-row"><div class="id-lbl">Código Sitio</div><div class="id-val">${esc(r.codigoSitio||'—')}</div></div>
+          <div class="id-row"><div class="id-lbl">Equipo</div><div class="id-val">${esc(r.equipo||'—')}</div></div>
+          <div class="id-row"><div class="id-lbl">Circuito</div><div class="id-val">${esc(r.circuito||'—')}</div></div>
         </div>
         <div class="inf-actions">
           <button class="act-btn act-ver" onclick="verInformePdfRecord('${r.id}')">👁 Ver Informe</button>
           <button class="act-btn act-dl" onclick="downloadRecord('${r.id}')">⬇ Descargar</button>
-          <button class="act-btn act-del" onclick="openConfirm('${r.id}','${(r.nombreSitio||'').replace(/'/g,"\\'")}')">🗑️ Borrar</button>
+          <button class="act-btn act-del" onclick="openConfirm('${r.id}')">🗑️ Borrar</button>
         </div>
       </div>
     </div>`;
@@ -1998,7 +2018,7 @@ function renderHist(records){
 function toggleInf(id){document.getElementById(`body_${id}`).classList.toggle('open');}
 async function downloadRecord(id){const a=document.createElement('a');a.href=`${SERVER}/descargar/${id}`;a.click();}
 function verInformePdfRecord(id){window.open(`${SERVER}/ver-informe.html?tipo=clima&id=${id}`,'_blank');}
-function openConfirm(id,sitio){pendingDeleteId=id;document.getElementById('confirmMsg').textContent=`Se eliminará el informe de "${sitio}". Esta acción no se puede deshacer.`;document.getElementById('confirmDel').classList.add('open');}
+function openConfirm(id){pendingDeleteId=id;const sitio=(allRecords.find(x=>x.id===id)||{}).nombreSitio||'';document.getElementById('confirmMsg').textContent=`Se eliminará el informe de "${sitio}". Esta acción no se puede deshacer.`;document.getElementById('confirmDel').classList.add('open');}
 function closeConfirm(){document.getElementById('confirmDel').classList.remove('open');pendingDeleteId=null;}
 async function confirmDelete(){if(!pendingDeleteId)return;closeConfirm();try{await fetch(`${SERVER}/registro/${pendingDeleteId}`,{method:'DELETE'});await loadHist();}catch(e){alert('Error: '+e.message);}}
 function openEmailModal(id,sitio,cod){pendingEmailId=id;document.getElementById('emailModalInfo').textContent=`Informe: ${cod} — Sitio: ${sitio}`;document.getElementById('emailStatus').style.display='none';document.getElementById('emailModal').classList.add('open');}
@@ -2055,16 +2075,16 @@ function renderPapelera(records) {
       <div class="pap-head" onclick="togglePap('${r.id}')">
         <div class="pap-icon">🗑</div>
         <div class="pap-meta">
-          <div class="pap-sitio">${r.nombreSitio||'Sin sitio'}</div>
-          <div class="pap-cod">${r.codInforme||'—'}</div>
-          <div class="pap-sub">Técnico: ${r.tecnico||'—'} · ${r.fecha||'—'}</div>
+          <div class="pap-sitio">${esc(r.nombreSitio||'Sin sitio')}</div>
+          <div class="pap-cod">${esc(r.codInforme||'—')}</div>
+          <div class="pap-sub">Técnico: ${esc(r.tecnico||'—')} · ${esc(r.fecha||'—')}</div>
         </div>
         <div class="pap-date">Eliminado<br>${delStr.replace(',','<br>')}</div>
       </div>
       <div class="pap-body" id="pbody_${r.id}">
         <div class="pap-actions">
           <button class="act-restore" onclick="restaurar('${r.id}')">↩ Restaurar</button>
-          <button class="act-perm" onclick="openConfirmPerm('${r.id}','${(r.nombreSitio||'').replace(/'/g,"\\'")}')">✕ Eliminar definitivo</button>
+          <button class="act-perm" onclick="openConfirmPerm('${r.id}')">✕ Eliminar definitivo</button>
         </div>
       </div>
     </div>`;
@@ -2083,8 +2103,9 @@ async function restaurar(id) {
   } catch(e) { tigToast('Error: '+e.message,'err'); }
 }
 
-function openConfirmPerm(id, sitio) {
+function openConfirmPerm(id) {
   pendingPermId = id;
+  const sitio = (allPapelera.find(x=>x.id===id)||{}).nombreSitio||'';
   document.getElementById('confirmPermMsg').textContent = `"${sitio}" será eliminado permanentemente del disco.`;
   document.getElementById('confirmPerm').classList.add('open');
 }
@@ -2170,6 +2191,33 @@ buildPhotoSlots();
 document.getElementById('fechaEjecucion').valueAsDate=new Date();
 document.getElementById('fechaTermino').valueAsDate=new Date();
 previewCod();checkServer();setInterval(checkServer,15000);
+
+// ══ AUTH GATE ══
+const _gate=document.getElementById('loginGate');
+function showLogin(){_gate.style.display='flex';}
+function hideLogin(){_gate.style.display='none';}
+async function checkAuth(){
+  try{const r=await fetch(SERVER+'/sesion',{cache:'no-store'});const d=await r.json();if(d.auth){hideLogin();return true;}}catch{}
+  showLogin();return false;
+}
+document.getElementById('loginForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const btn=document.getElementById('loginBtn'),err=document.getElementById('loginErr');
+  btn.disabled=true;btn.textContent='Entrando...';err.style.display='none';
+  try{
+    const r=await fetch(SERVER+'/login',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({usuario:document.getElementById('loginUser').value,clave:document.getElementById('loginPass').value})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||'Error al iniciar sesión');
+    hideLogin();document.getElementById('loginPass').value='';
+    loadHist(true);loadPapelera(true);
+  }catch(ex){err.textContent='❌ '+ex.message;err.style.display='block';}
+  finally{btn.disabled=false;btn.textContent='Entrar';}
+});
+// Cualquier respuesta 401 (sesión vencida) reabre el login.
+const _origFetch=window.fetch.bind(window);
+window.fetch=async(...args)=>{const res=await _origFetch(...args);if(res.status===401)showLogin();return res;};
+checkAuth();
 
 // Auto nueva línea al escribir punto en resumen
 document.getElementById('resumen').addEventListener('input', function(){

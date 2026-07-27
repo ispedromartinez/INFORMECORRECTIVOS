@@ -345,6 +345,22 @@ main{max-width:var(--max-w);margin:0 auto;padding:18px 14px 40px;}
 </head>
 <body>
 
+<!-- ══ LOGIN GATE ══ -->
+<div id="loginGate" style="display:none;position:fixed;inset:0;z-index:99999;background:#0f172a;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:16px;padding:30px 26px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.4);">
+    <div style="text-align:center;font-size:20px;font-weight:800;color:#1e293b;margin-bottom:6px;">🔒 Iniciar sesión</div>
+    <div style="text-align:center;font-size:13px;color:#64748b;margin-bottom:20px;">Informes WOM ICETEL</div>
+    <form id="loginForm" autocomplete="on">
+      <label style="display:block;font-size:12px;font-weight:700;color:#334155;margin-bottom:5px;">Usuario</label>
+      <input type="email" id="loginUser" autocomplete="username" placeholder="correo@dominio.cl" style="width:100%;box-sizing:border-box;padding:12px;border:1.5px solid #cbd5e1;border-radius:9px;font-size:15px;margin-bottom:14px;" required>
+      <label style="display:block;font-size:12px;font-weight:700;color:#334155;margin-bottom:5px;">Clave</label>
+      <input type="password" id="loginPass" autocomplete="current-password" placeholder="••••••••" style="width:100%;box-sizing:border-box;padding:12px;border:1.5px solid #cbd5e1;border-radius:9px;font-size:15px;margin-bottom:18px;" required>
+      <button type="submit" id="loginBtn" style="width:100%;padding:13px;border:none;border-radius:10px;background:#a3129b;color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Entrar</button>
+      <div id="loginErr" style="display:none;margin-top:12px;padding:10px;border-radius:8px;background:#fef2f2;color:#b91c1c;font-size:13px;text-align:center;"></div>
+    </form>
+  </div>
+</div>
+
 <div class="top-sticky">
 <header>
   <div class="hdr-inner">
@@ -794,7 +810,7 @@ function updateEstadoActual() {
   const btnC = g('btn-continuar');
   if (!txt) return;
   if (ticket) {
-    txt.innerHTML = `Informe en progreso: <strong style="color:var(--mag);">${ticket}</strong>`;
+    txt.innerHTML = `Informe en progreso: <strong style="color:var(--mag);">${esc(ticket)}</strong>`;
     if (btnC) btnC.style.display = '';
   } else {
     txt.innerHTML = `No hay Informe en progreso. Presiona <strong style="color:var(--mag);">Crear Nuevo Informe</strong> para comenzar.`;
@@ -1169,6 +1185,8 @@ function verInformePdfWom() {
 // ── Historial ─────────────────────────────────────────────────
 function toggleInf(id){document.getElementById(`body_${id}`)?.classList.toggle('open');}
 
+// Escapa datos del registro antes de innerHTML: evita XSS almacenado.
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function infCardWom(e, { idPrefix='', icon='📄', dateField='fechaCreacion', dateLabel='', actions='' } = {}) {
   const fc = e[dateField] ? new Date(e[dateField]) : null;
   const dateStr = fc ? fc.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
@@ -1180,19 +1198,19 @@ function infCardWom(e, { idPrefix='', icon='📄', dateField='fechaCreacion', da
     <div class="inf-head" onclick="toggleInf('${uid}')">
       <div class="inf-icon">${icon}</div>
       <div class="inf-meta">
-        <div class="inf-sitio">${e.ticket||'—'}</div>
-        <div class="inf-cod">${e.codInterno?`INC-${e.codInterno}`:(e.instalacion||'—')}</div>
-        <div class="inf-sub">${e.tipoActividad||'—'} · ${e.instalacion||'—'}</div>
+        <div class="inf-sitio">${esc(e.ticket||'—')}</div>
+        <div class="inf-cod">${e.codInterno?`INC-${esc(e.codInterno)}`:esc(e.instalacion||'—')}</div>
+        <div class="inf-sub">${esc(e.tipoActividad||'—')} · ${esc(e.instalacion||'—')}</div>
         <span class="inf-badge">📷 ${photos} foto${photos!==1?'s':''}</span>
       </div>
       <div style="font-size:10px;color:var(--muted);text-align:right;flex-shrink:0">${dateBox}</div>
     </div>
     <div class="inf-body" id="body_${uid}">
       <div class="inf-detail-grid">
-        <div class="id-row"><div class="id-lbl">Fecha Inicio</div><div class="id-val">${e.fechaInicio||'—'}</div></div>
-        <div class="id-row"><div class="id-lbl">Tipo Actividad</div><div class="id-val">${e.tipoActividad||'—'}</div></div>
-        <div class="id-row"><div class="id-lbl">Instalación</div><div class="id-val">${e.instalacion||'—'}</div></div>
-        <div class="id-row"><div class="id-lbl">Técnicos</div><div class="id-val">${tecs||'—'}</div></div>
+        <div class="id-row"><div class="id-lbl">Fecha Inicio</div><div class="id-val">${esc(e.fechaInicio||'—')}</div></div>
+        <div class="id-row"><div class="id-lbl">Tipo Actividad</div><div class="id-val">${esc(e.tipoActividad||'—')}</div></div>
+        <div class="id-row"><div class="id-lbl">Instalación</div><div class="id-val">${esc(e.instalacion||'—')}</div></div>
+        <div class="id-row"><div class="id-lbl">Técnicos</div><div class="id-val">${esc(tecs||'—')}</div></div>
       </div>
       <div class="inf-actions">${actions}</div>
     </div>
@@ -1467,6 +1485,32 @@ if (!restoreState()) {
   g('fecha-inicio').valueAsDate = new Date();
 }
 g('ticket').addEventListener('input', () => { updateBadge(); updateEstadoActual(); });
+
+// ══ AUTH GATE ══
+const _gate = document.getElementById('loginGate');
+function showLogin(){ _gate.style.display = 'flex'; }
+function hideLogin(){ _gate.style.display = 'none'; }
+async function checkAuth(){
+  try{ const r = await fetch('/sesion',{cache:'no-store'}); const d = await r.json(); if(d.auth){ hideLogin(); return true; } }catch{}
+  showLogin(); return false;
+}
+document.getElementById('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn'), err = document.getElementById('loginErr');
+  btn.disabled = true; btn.textContent = 'Entrando...'; err.style.display = 'none';
+  try{
+    const r = await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({usuario:document.getElementById('loginUser').value,clave:document.getElementById('loginPass').value})});
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.error||'Error al iniciar sesión');
+    hideLogin(); document.getElementById('loginPass').value='';
+    if(typeof loadHistorial==='function') loadHistorial();
+  }catch(ex){ err.textContent = '❌ '+ex.message; err.style.display='block'; }
+  finally{ btn.disabled=false; btn.textContent='Entrar'; }
+});
+const _origFetch = window.fetch.bind(window);
+window.fetch = async(...args) => { const res = await _origFetch(...args); if(res.status===401) showLogin(); return res; };
+checkAuth();
 </script>
 </body>
 </html>

@@ -41,7 +41,25 @@ const app = express();
 // no confía en X-Forwarded-For y express-rate-limit no puede identificar
 // la IP real del cliente (todos comparten el límite de tasa del proxy).
 app.set('trust proxy', 1);
-app.use(helmet({ contentSecurityPolicy: false })); // CSP off: HTML usa scripts inline
+// CSP: la app usa scripts/estilos inline (por eso 'unsafe-inline' en script/
+// style) y Google Fonts. Lo importante para defensa anti-XSS: connect-src e
+// img-src limitados a 'self'/data/blob impiden que un script inyectado
+// exfiltre datos a un dominio externo. object-src/frame-ancestors cerrados.
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      connectSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+}));
 
 const PORT = process.env.PORT || 3000;
 const allowedOrigins = [
@@ -813,6 +831,76 @@ async function autoEnviarInforme({ buffer, filename, subject, text }) {
 // ── Routes ────────────────────────────────────────────────
 app.get('/ping', (req,res) => res.json({ok:true}));
 
+// ── Autenticación ──────────────────────────────────────────
+// Login simple de un solo usuario con sesión por cookie HttpOnly firmada
+// (HMAC), sin estado en el servidor: el token lleva su propia expiración y
+// firma, así funciona en Render sin store de sesiones. Las credenciales SOLO
+// vienen de variables de entorno: nunca se hardcodean (el repo es público).
+// Sin AUTH_USER/AUTH_PASS definidos, el login queda deshabilitado.
+const AUTH_USER = (process.env.AUTH_USER || '').trim().toLowerCase();
+const AUTH_PASS = process.env.AUTH_PASS || '';
+const AUTH_CONFIGURED = !!(AUTH_USER && AUTH_PASS);
+// Secreto para firmar la cookie. Si no se define, se genera uno al arrancar:
+// las sesiones se invalidan en cada redeploy (aceptable). Para sesiones que
+// sobrevivan a reinicios, define SESSION_SECRET en Render.
+const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 h
+
+function makeToken() {
+  const payload = `${AUTH_USER}|${Date.now() + SESSION_TTL_MS}`;
+  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+  return `${Buffer.from(payload).toString('base64url')}.${sig}`;
+}
+function verifyToken(tok) {
+  if (!tok || typeof tok !== 'string') return false;
+  const [b64, sig] = tok.split('.');
+  if (!b64 || !sig) return false;
+  let payload;
+  try { payload = Buffer.from(b64, 'base64url').toString(); } catch { return false; }
+  const expected = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+  const a = Buffer.from(sig), b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return false;
+  const exp = parseInt(payload.split('|').pop(), 10);
+  return Number.isFinite(exp) && Date.now() < exp;
+}
+function getCookie(req, name) {
+  const raw = req.headers.cookie || '';
+  for (const part of raw.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx < 0) continue;
+    if (part.slice(0, idx).trim() === name) return decodeURIComponent(part.slice(idx + 1).trim());
+  }
+  return null;
+}
+function cookieHeader(value, maxAgeSec) {
+  const secure = !!process.env.RENDER_EXTERNAL_URL; // Render sirve por HTTPS
+  return `sesion=${value}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAgeSec}${secure ? '; Secure' : ''}`;
+}
+function requireAuth(req, res, next) {
+  if (verifyToken(getCookie(req, 'sesion'))) return next();
+  return res.status(401).json({ error: 'No autenticado. Inicia sesión.' });
+}
+
+app.post('/login', heavyLimiter, (req, res) => {
+  if (!AUTH_CONFIGURED) {
+    return res.status(503).json({ error: 'Autenticación no configurada: define AUTH_USER y AUTH_PASS en el servidor.' });
+  }
+  const { usuario, clave } = req.body || {};
+  const u = String(usuario || '').trim().toLowerCase();
+  const okUser = u.length === AUTH_USER.length &&
+    crypto.timingSafeEqual(Buffer.from(u), Buffer.from(AUTH_USER));
+  const pa = Buffer.from(String(clave || '')), pb = Buffer.from(AUTH_PASS);
+  const okPass = pa.length === pb.length && crypto.timingSafeEqual(pa, pb);
+  if (!okUser || !okPass) return res.status(401).json({ error: 'Usuario o clave incorrectos.' });
+  res.setHeader('Set-Cookie', cookieHeader(makeToken(), SESSION_TTL_MS / 1000));
+  res.json({ ok: true });
+});
+app.post('/logout', (req, res) => {
+  res.setHeader('Set-Cookie', cookieHeader('', 0));
+  res.json({ ok: true });
+});
+app.get('/sesion', (req, res) => res.json({ auth: verifyToken(getCookie(req, 'sesion')) }));
+
 // Los endpoints de diagnóstico ejecutan operaciones reales con las claves del
 // servidor (escriben en Supabase, suben al bucket, consumen cuota de Brevo).
 // En un deploy público cualquiera con la URL podría abusar de ellos, así que
@@ -916,6 +1004,11 @@ app.get('/version', (req,res) => {
     res.json({ v: mtime });
   } catch { res.json({ v: 0 }); }
 });
+
+// A partir de aquí, todo requiere sesión. Lo anterior (páginas, assets,
+// /ping, /version, /login, /logout, /sesion y los diagnósticos con su propio
+// ADMIN_TOKEN) queda público a propósito para poder cargar la app y loguearse.
+app.use(requireAuth);
 
 app.post('/generar', heavyLimiter, async (req,res) => {
   try {
