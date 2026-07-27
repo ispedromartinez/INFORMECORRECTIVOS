@@ -1974,8 +1974,8 @@ function renderHist(records){
         <div class="inf-detail-grid">
           <div class="id-row"><div class="id-lbl">Fecha Ejecución</div><div class="id-val">${r.fecha||'—'}</div></div>
           <div class="id-row"><div class="id-lbl">Código Sitio</div><div class="id-val">${r.codigoSitio||'—'}</div></div>
-          <div class="id-row"><div class="id-lbl">Supervisor</div><div class="id-val">${r.supervisor||'—'}</div></div>
-          <div class="id-row"><div class="id-lbl">N° OT</div><div class="id-val">${r.numOT||'—'}</div></div>
+          <div class="id-row"><div class="id-lbl">Equipo</div><div class="id-val">${r.equipo||'—'}</div></div>
+          <div class="id-row"><div class="id-lbl">Circuito</div><div class="id-val">${r.circuito||'—'}</div></div>
         </div>
         <div class="inf-actions">
           <button class="act-btn act-ver" onclick="verInformePdfRecord('${r.id}')">👁 Ver Informe</button>
@@ -1997,6 +1997,7 @@ function openEmailModal(id,sitio,cod){pendingEmailId=id;document.getElementById(
 function closeEmailModal(){document.getElementById('emailModal').classList.remove('open');pendingEmailId=null;}
 async function sendEmail(){
   const st=document.getElementById('emailStatus');const to=document.getElementById('emailTo').value.trim();
+  st.style.display='';
   if(!to){st.className='status err';st.textContent='⚠ Ingresa un correo destinatario.';return;}
   st.className='status loading';st.textContent='📤 Enviando...';
   try{
