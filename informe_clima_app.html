@@ -1980,7 +1980,6 @@ function renderHist(records){
         <div class="inf-actions">
           <button class="act-btn act-ver" onclick="verInformePdfRecord('${r.id}')">👁 Ver Informe</button>
           <button class="act-btn act-dl" onclick="downloadRecord('${r.id}')">⬇ Descargar</button>
-          <button class="act-btn act-mail" onclick="openEmailModal('${r.id}','${(r.nombreSitio||'').replace(/'/g,"\\'")}','${(r.codInforme||'').replace(/'/g,"\\'")}')">✉ Enviar</button>
           <button class="act-btn act-del" onclick="openConfirm('${r.id}','${(r.nombreSitio||'').replace(/'/g,"\\'")}')">🗑️ Borrar</button>
         </div>
       </div>
