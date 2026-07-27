@@ -53,13 +53,14 @@ const allowedOrigins = [
   ...(process.env.RENDER_EXTERNAL_URL ? [process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '')] : []),
 ];
 const lanOriginPattern = new RegExp(`^http://192\\.168\\.\\d{1,3}\\.\\d{1,3}:${PORT}$`);
-// Cualquier subdominio https de Render (el sitio llamándose a sí mismo)
-const renderOriginPattern = /^https:\/\/[a-z0-9-]+\.onrender\.com$/i;
 
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)
-        || lanOriginPattern.test(origin) || renderOriginPattern.test(origin)) {
+    // Solo el propio dominio del deploy (RENDER_EXTERNAL_URL), un dominio
+    // custom (ALLOWED_ORIGIN) y local/LAN para desarrollo. Antes se aceptaba
+    // cualquier *.onrender.com, lo que permitía que un sitio ajeno alojado en
+    // Render llamara a esta API desde el navegador de una víctima.
+    if (!origin || allowedOrigins.includes(origin) || lanOriginPattern.test(origin)) {
       return callback(null, true);
     }
     // Rechazo limpio (sin cabeceras CORS) en vez de lanzar un Error,
