@@ -719,18 +719,89 @@ async function buildDocx(d) {
     );
   }
 
-  const doc = new Document({
-    sections: [{
-      headers: { default: new Header({ children: headerChildren }) },
+  // ── PORTADA — solo para sitios NextStream (DATA CENTER SAN MARTIN / APOQUINDO) ──
+  const SITIOS_CON_PORTADA = ['DATA CENTER SAN MARTIN', 'DATA CENTER APOQUINDO'];
+  const sitioNorm = (d.nombreSitio || '').trim().toUpperCase();
+  const docSections = [];
+
+  if (SITIOS_CON_PORTADA.includes(sitioNorm)) {
+    const COVER_BLUE = '1F497D';
+    const coverChildren = [];
+
+    try {
+      let logoPath = path.join(__dirname, 'logo.png');
+      let logoType = 'png';
+      if (!fs.existsSync(logoPath)) { logoPath = path.join(__dirname, 'logo.jpeg'); logoType = 'jpeg'; }
+      const icetelLogoData = fs.readFileSync(logoPath);
+      coverChildren.push(new Paragraph({
+        alignment: AlignmentType.LEFT,
+        spacing: { before: 0, after: 0 },
+        children: [new ImageRun({ data: icetelLogoData, transformation: { width: 120, height: 65 }, type: logoType })]
+      }));
+    } catch (e) { console.log('Logo Icetel no encontrado para portada:', e.message); }
+
+    const coverLine = (text, opts = {}) => new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: opts.before || 0, after: opts.after || 0 },
+      children: [new TextRun({ text, bold: true, size: opts.size || 28, font: 'Calibri', color: COVER_BLUE })]
+    });
+    const gap = twips => new Paragraph({ spacing: { before: 0, after: twips }, children: [] });
+
+    coverChildren.push(
+      gap(700),
+      coverLine(`${v(d.resumen)}.`, { before: 0 }),
+      coverLine(`Equipo ${v(d.equipo)} Circuito ${v(d.circuito)} ${v(d.eqMarca)}`),
+      coverLine(`Sala ${v(d.sala)}`),
+      gap(300),
+      coverLine(sitioNorm, { size: 32 }),
+      gap(300),
+      coverLine(`Código informe ${v(d.codInforme)}`),
+      coverLine(v(d.fecha)),
+      gap(6000)
+    );
+
+    try {
+      const nsLogoPath = path.join(__dirname, 'nextstream-logo.png');
+      if (fs.existsSync(nsLogoPath)) {
+        const nsLogoData = fs.readFileSync(nsLogoPath);
+        coverChildren.push(
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 0, after: 100 },
+            children: [new TextRun({ text: 'CLIENTE', bold: true, size: 24, font: 'Calibri', color: '000000' })]
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 0, after: 0 },
+            children: [new ImageRun({ data: nsLogoData, transformation: { width: 220, height: 29 }, type: 'png' })]
+          })
+        );
+      }
+    } catch (e) { console.log('Logo NextStream no encontrado para portada:', e.message); }
+
+    docSections.push({
       properties: {
         page: {
           size: { width: 12240, height: 15840 },
-          margin: { top: 1080, right: 1186, bottom: 1417, left: 1185, header: 284 }
+          margin: { top: 1080, right: 1186, bottom: 1417, left: 1185 }
         }
       },
-      children: sectionChildren
-    }]
+      children: coverChildren
+    });
+  }
+
+  docSections.push({
+    headers: { default: new Header({ children: headerChildren }) },
+    properties: {
+      page: {
+        size: { width: 12240, height: 15840 },
+        margin: { top: 1080, right: 1186, bottom: 1417, left: 1185, header: 284 }
+      }
+    },
+    children: sectionChildren
   });
+
+  const doc = new Document({ sections: docSections });
 
   return Packer.toBuffer(doc);
 }
