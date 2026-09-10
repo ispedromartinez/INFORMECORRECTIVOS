@@ -132,6 +132,20 @@ for (const [route, modPath] of [
 ]) {
   app.get(route, (req, res) => res.sendFile(path.join(__dirname, 'node_modules', modPath)));
 }
+// Contrato WOM finalizado: se bloquea todo el módulo (página, API y descargas).
+const WOM_ROUTE_RE = /^\/(wom|actividades-wom|generar-wom|registro-wom|descargar-wom|test-insert-wom)(\/|$)/;
+app.use((req, res, next) => {
+  if (WOM_ROUTE_RE.test(req.path)) {
+    return res.status(403).send(`<!doctype html><meta charset="utf-8">
+      <div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:Arial,sans-serif;background:#f4f4f4">
+        <div style="border:5px solid #C0392B;color:#C0392B;font-weight:800;font-size:34px;letter-spacing:4px;
+                    padding:16px 40px;border-radius:10px;background:#fff;transform:rotate(-8deg);
+                    box-shadow:0 4px 14px rgba(0,0,0,.15)">CONTRATO TERMINADO</div>
+      </div>`);
+  }
+  next();
+});
+
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'selector.html')));
 app.get('/tigo', (req, res) => res.sendFile(path.join(__dirname, 'informe_clima_app.html')));
 app.get('/wom', (req, res) => res.sendFile(path.join(__dirname, 'informe_wom_app.html')));
