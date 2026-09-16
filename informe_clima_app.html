@@ -1686,6 +1686,7 @@ function setupPhotoInteraction(idx){
     // Touch drag + pinch
     slot.addEventListener('touchstart',e=>{
       if(!photoFiles[idx])return;
+      if(e.target.closest('button'))return;
       if(e.touches.length===1){
         drag=true;sx=e.touches[0].clientX;sy=e.touches[0].clientY;
         stx=photoTransforms[idx].x;sty=photoTransforms[idx].y;
