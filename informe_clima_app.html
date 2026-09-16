@@ -896,7 +896,9 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
       </div>
       <button class="modal-close" onclick="closeEquipoModal()">✕</button>
     </div>
+    <button class="rep-mini" style="width:100%;margin-bottom:14px;padding:11px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:7px;" onclick="descargarReporteEquiposGlobal()">📋 Reporte global de todos los equipos</button>
     <div class="card" style="margin-bottom:14px;">
+      <div class="card-title">Ver un equipo puntual</div>
       <div class="row2">
         <div class="field" style="margin-bottom:0;"><label>Sitio</label>
           <select id="eqmSitio" class="eqm-select" onchange="onEqmSitioChange()"><option value="">Selecciona sitio...</option></select>
@@ -1998,6 +2000,15 @@ async function descargarReporteEquipo(){
     const blob=await resp.blob();
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');a.href=url;a.download=`seguimiento-equipo-${equipo}.xlsx`;a.click();URL.revokeObjectURL(url);
+  }catch(e){tigToast('❌ '+e.message,'err');}
+}
+async function descargarReporteEquiposGlobal(){
+  try{
+    const resp=await fetch(`${SERVER}/reporte-equipos-global`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
+    if(!resp.ok){const e=await resp.json();throw new Error(e.error||'Error del servidor');}
+    const blob=await resp.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download='reporte-equipos-global.xlsx';a.click();URL.revokeObjectURL(url);
   }catch(e){tigToast('❌ '+e.message,'err');}
 }
 document.getElementById('equipoModal').addEventListener('click',function(e){if(e.target===this)closeEquipoModal();});
