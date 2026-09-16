@@ -385,6 +385,17 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
 .cbtn:disabled{opacity:.7;cursor:default;}
 .lpu-input{width:100%;padding:11px 13px;border-radius:9px;border:1.5px solid #e2e8f0;font-size:14px;font-family:inherit;margin-bottom:18px;color:var(--text);}
 .lpu-input:focus{outline:none;border-color:var(--tigo,#0073EA);}
+.eqm-select{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 13px;font-size:14px;color:var(--text);background:#fff;font-family:inherit;}
+.eqm-select:disabled{background:#f4f5f7;color:var(--muted);cursor:not-allowed;}
+.eqm-stats{display:flex;gap:10px;margin-bottom:14px;}
+.eqm-stat{flex:1;background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 10px;text-align:center;}
+.eqm-stat b{display:block;font-size:22px;font-weight:800;color:var(--tigo,#0073EA);}
+.eqm-stat span{font-size:11px;color:var(--muted);font-weight:600;}
+.eqm-item{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;font-size:13px;}
+.eqm-item .eqm-fecha{font-weight:700;}
+.eqm-item .eqm-sub{color:var(--muted);font-size:11.5px;}
+.eqm-item .eqm-gap{font-size:11px;font-weight:700;color:var(--tigo,#0073EA);background:#EAF3FF;border-radius:20px;padding:4px 10px;white-space:nowrap;}
+.eqm-empty{text-align:center;color:var(--muted);font-size:13px;padding:30px 10px;}
 .cspin{display:inline-block;width:15px;height:15px;border:2.5px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;animation:genSpin .7s linear infinite;vertical-align:-2px;}
 
 /* ── OVERLAY DE GENERACIÓN ── */
@@ -779,6 +790,7 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
   <div class="hist-search-wrap">
     <input type="text" id="histSearch" placeholder="🔍 Buscar por sitio, código, técnico, OT..." oninput="filterHist(this.value)">
     <button id="btnRefreshHist" class="btn-refresh" onclick="refreshHist()">↻</button>
+    <button class="btn-refresh" onclick="openEquipoModal()">🔧 Equipo</button>
     <button class="btn-refresh" onclick="openReporteModal()">📊 Reporte</button>
   </div>
   <div class="hist-stats" id="histStats">
@@ -870,6 +882,31 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
       <div id="reporteColumnas" class="rep-fields"></div>
     </div>
     <button class="btn-gen" id="btnGenerarReporte" style="font-size:14px;padding:13px;display:flex;align-items:center;justify-content:center;gap:8px;" onclick="generarReporte()"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Generar Excel</button>
+  </div>
+</div>
+
+<!-- EQUIPO MODAL -->
+<div class="modal-overlay centered" id="equipoModal">
+  <div class="modal-box rep-modal" style="max-width:460px;max-height:88vh;overflow-y:auto;">
+    <div class="rep-header">
+      <div class="rep-header-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>
+      <div class="rep-header-txt">
+        <div class="rep-header-title">Seguimiento de equipo</div>
+        <div class="rep-header-sub">Historial de intervenciones por equipo</div>
+      </div>
+      <button class="modal-close" onclick="closeEquipoModal()">✕</button>
+    </div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="row2">
+        <div class="field" style="margin-bottom:0;"><label>Sitio</label>
+          <select id="eqmSitio" class="eqm-select" onchange="onEqmSitioChange()"><option value="">Selecciona sitio...</option></select>
+        </div>
+        <div class="field" style="margin-bottom:0;"><label>Equipo</label>
+          <select id="eqmEquipo" class="eqm-select" onchange="onEqmEquipoChange()" disabled><option value="">Selecciona equipo...</option></select>
+        </div>
+      </div>
+    </div>
+    <div id="eqmResultados"></div>
   </div>
 </div>
 
@@ -1885,6 +1922,86 @@ async function loadHist(silent=false){
     if(!silent)document.getElementById('histList').innerHTML='<div class="hist-empty"><div class="ei">⚠️</div><p>No se pudo conectar al servidor.<br><strong>Ejecuta: node server.js</strong></p></div>';
   }
 }
+// ══ SEGUIMIENTO DE EQUIPO ══
+function eqmKey(r){return `${r.codigoSitio||''}|||${r.equipo||''}|||${r.circuito||''}`;}
+// "fecha" es la fecha real de ejecución (ej. "10-01-2026" o rango "10-01-2026 - 12-01-2026"),
+// más fiel al intervalo entre visitas que fechaCreacion (cuándo se subió el informe).
+function parseFechaEjecucion(fecha){
+  const first=String(fecha||'').split(' - ')[0].trim();
+  const m=first.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if(!m)return null;
+  const d=new Date(Number(m[3]),Number(m[2])-1,Number(m[1]));
+  return isNaN(d.getTime())?null:d;
+}
+function fechaOrdenable(r){return parseFechaEjecucion(r.fecha)||new Date(r.fechaCreacion);}
+function openEquipoModal(){
+  const sel=document.getElementById('eqmSitio');
+  const sitios=[...new Map(allRecords.filter(r=>r.equipo).map(r=>[r.codigoSitio,r.nombreSitio])).entries()]
+    .sort((a,b)=>(a[1]||'').localeCompare(b[1]||''));
+  sel.innerHTML='<option value="">Selecciona sitio...</option>'+sitios.map(([cod,nom])=>`<option value="${esc(cod)}">${esc(nom||cod)}</option>`).join('');
+  document.getElementById('eqmEquipo').innerHTML='<option value="">Selecciona equipo...</option>';
+  document.getElementById('eqmEquipo').disabled=true;
+  document.getElementById('eqmResultados').innerHTML='';
+  document.getElementById('equipoModal').classList.add('open');
+}
+function closeEquipoModal(){document.getElementById('equipoModal').classList.remove('open');}
+function onEqmSitioChange(){
+  const cod=document.getElementById('eqmSitio').value;
+  const eqSel=document.getElementById('eqmEquipo');
+  document.getElementById('eqmResultados').innerHTML='';
+  if(!cod){eqSel.innerHTML='<option value="">Selecciona equipo...</option>';eqSel.disabled=true;return;}
+  const equipos=[...new Map(allRecords.filter(r=>r.codigoSitio===cod&&r.equipo).map(r=>[eqmKey(r),r])).values()]
+    .sort((a,b)=>(a.equipo||'').localeCompare(b.equipo||''));
+  eqSel.innerHTML='<option value="">Selecciona equipo...</option>'+equipos.map(r=>{
+    const label=`N° ${r.equipo}${r.circuito?' · Circuito '+r.circuito:''}${r.tipoEquipo?' · '+r.tipoEquipo:''}`;
+    return `<option value="${esc(eqmKey(r))}">${esc(label)}</option>`;
+  }).join('');
+  eqSel.disabled=false;
+}
+function onEqmEquipoChange(){
+  const key=document.getElementById('eqmEquipo').value;
+  const box=document.getElementById('eqmResultados');
+  if(!key){box.innerHTML='';return;}
+  const items=allRecords.filter(r=>eqmKey(r)===key).sort((a,b)=>fechaOrdenable(a)-fechaOrdenable(b));
+  if(!items.length){box.innerHTML='<div class="eqm-empty">Sin intervenciones registradas.</div>';return;}
+  let prev=null,totalGap=0,gaps=0;
+  const rows=items.map(r=>{
+    const fc=fechaOrdenable(r);
+    const dias=prev?Math.round((fc-prev)/86400000):null;
+    if(dias!=null){totalGap+=dias;gaps++;}
+    prev=fc;
+    return {r,dias};
+  });
+  const avg=gaps?Math.round(totalGap/gaps):null;
+  box.innerHTML=`
+    <div class="eqm-stats">
+      <div class="eqm-stat"><b>${items.length}</b><span>Intervenciones</span></div>
+      <div class="eqm-stat"><b>${avg!=null?avg:'—'}</b><span>Días promedio</span></div>
+    </div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-title">Historial</div>
+      ${rows.map(({r,dias})=>`<div class="eqm-item">
+        <div><div class="eqm-fecha">${esc(r.fecha||'—')}</div><div class="eqm-sub">${esc(r.tecnico||'—')} · OT ${esc(r.numOT||'—')}</div></div>
+        <span class="eqm-gap">${dias==null?'Primera':dias+' día'+(dias===1?'':'s')}</span>
+      </div>`).join('')}
+    </div>
+    <button class="btn-gen" style="font-size:14px;padding:13px;display:flex;align-items:center;justify-content:center;gap:8px;" onclick="descargarReporteEquipo()"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Descargar Excel</button>
+  `;
+}
+async function descargarReporteEquipo(){
+  const key=document.getElementById('eqmEquipo').value;
+  if(!key)return;
+  const [codigoSitio,equipo,circuito]=key.split('|||');
+  try{
+    const resp=await fetch(`${SERVER}/reporte-equipo`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codigoSitio,equipo,circuito})});
+    if(!resp.ok){const e=await resp.json();throw new Error(e.error||'Error del servidor');}
+    const blob=await resp.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=`seguimiento-equipo-${equipo}.xlsx`;a.click();URL.revokeObjectURL(url);
+  }catch(e){tigToast('❌ '+e.message,'err');}
+}
+document.getElementById('equipoModal').addEventListener('click',function(e){if(e.target===this)closeEquipoModal();});
+
 function filterHist(q){
   if(!q){renderHist(allRecords);return;}
   const nq=norm(q);

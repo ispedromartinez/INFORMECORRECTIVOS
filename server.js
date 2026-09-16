@@ -1426,6 +1426,48 @@ function reporteHandler(colMap, listFn, filename) {
 
 app.post('/reporte', reporteHandler(REPORTE_COLUMNAS_CLIMA, () => dbClimaList(null), 'reporte-tigo.xlsx'));
 
+// ── Seguimiento de equipo: historial de intervenciones de un equipo puntual
+// (mismo sitio + N° equipo + circuito), con días transcurridos entre cada una.
+const REPORTE_COLUMNAS_EQUIPO = {
+  fecha: 'Fecha', codInforme: 'Código Informe', tecnico: 'Técnico',
+  numOT: 'N° OT', tipoEquipo: 'Tipo de Equipo', marca: 'Marca',
+  diasDesdeAnterior: 'Días desde intervención anterior'
+};
+// El campo "fecha" es la fecha real de ejecución (ej. "10-01-2026" o
+// "10-01-2026 - 12-01-2026"), lo que refleja mejor el intervalo entre
+// visitas que fechaCreacion (que es cuándo se subió el informe al sistema).
+function parseFechaEjecucion(fecha) {
+  const first = String(fecha || '').split(' - ')[0].trim();
+  const m = first.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (!m) return null;
+  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+app.post('/reporte-equipo', async (req, res) => {
+  try {
+    const { codigoSitio, equipo, circuito } = req.body || {};
+    if (!codigoSitio || !equipo) return res.status(400).json({ error: 'Falta sitio o equipo' });
+    const all = await dbClimaList(null);
+    const filtrado = all.filter(r =>
+      String(r.codigoSitio || '') === String(codigoSitio) &&
+      String(r.equipo || '') === String(equipo) &&
+      String(r.circuito || '') === String(circuito || '')
+    ).sort((a, b) => (parseFechaEjecucion(a.fecha) || new Date(a.fechaCreacion)) - (parseFechaEjecucion(b.fecha) || new Date(b.fechaCreacion)));
+    if (!filtrado.length) return res.status(404).json({ error: 'No hay intervenciones registradas para ese equipo' });
+    let prev = null;
+    const rows = filtrado.map(r => {
+      const fc = parseFechaEjecucion(r.fecha) || new Date(r.fechaCreacion);
+      const dias = prev ? Math.round((fc - prev) / 86400000) : null;
+      prev = fc;
+      return { ...r, diasDesdeAnterior: dias == null ? '—' : String(dias) };
+    });
+    const buffer = buildReporteExcel(REPORTE_COLUMNAS_EQUIPO, Object.keys(REPORTE_COLUMNAS_EQUIPO), rows, 'Seguimiento Equipo');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="seguimiento-equipo-${sanitizeFnamePart(codigoSitio)}-${sanitizeFnamePart(equipo)}.xlsx"`);
+    res.send(buffer);
+  } catch (e) { console.error('POST /reporte-equipo:', e); res.status(500).json({ error: e.message || 'Error al generar el reporte' }); }
+});
+
 // ═══════════════════════════════════════════════════════════════
 // MÓDULO WOM
 // ═══════════════════════════════════════════════════════════════
