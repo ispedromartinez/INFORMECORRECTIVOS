@@ -380,7 +380,11 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
 .cbtn.cancel:hover{background:#e2e8f0;}
 .cbtn.confirm{background:var(--red);color:#fff;}
 .cbtn.confirm:hover{background:#b91c1c;}
+.cbtn.confirm.lpu{background:var(--tigo,#0073EA);}
+.cbtn.confirm.lpu:hover{background:#1976D2;}
 .cbtn:disabled{opacity:.7;cursor:default;}
+.lpu-input{width:100%;padding:11px 13px;border-radius:9px;border:1.5px solid #e2e8f0;font-size:14px;font-family:inherit;margin-bottom:18px;color:var(--text);}
+.lpu-input:focus{outline:none;border-color:var(--tigo,#0073EA);}
 .cspin{display:inline-block;width:15px;height:15px;border:2.5px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;animation:genSpin .7s linear infinite;vertical-align:-2px;}
 
 /* ── OVERLAY DE GENERACIÓN ── */
@@ -878,6 +882,19 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
     <div class="confirm-btns">
       <button class="cbtn cancel" onclick="closeConfirm()">Cancelar</button>
       <button class="cbtn confirm" onclick="confirmDelete()">Borrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="lpuModal">
+  <div class="confirm-box">
+    <div class="confirm-icon">✏️</div>
+    <div class="confirm-title">Editar LPU</div>
+    <div class="confirm-msg">Actualiza el valor de LPU del informe. Se regenerará el Word con el nuevo dato.</div>
+    <input type="text" id="lpuInput" class="lpu-input" placeholder="Ej: LPU-1234" autocomplete="off">
+    <div class="confirm-btns">
+      <button class="cbtn cancel" onclick="closeLpuModal()">Cancelar</button>
+      <button class="cbtn confirm lpu" id="lpuSaveBtn" onclick="saveLpu()">Guardar</button>
     </div>
   </div>
 </div>
@@ -2010,18 +2027,32 @@ function renderHist(records){
 }
 function toggleInf(id){document.getElementById(`body_${id}`).classList.toggle('open');}
 async function downloadRecord(id){const a=document.createElement('a');a.href=`${SERVER}/descargar/${id}`;a.click();}
-async function editLpu(id){
+let pendingLpuId=null;
+function editLpu(id){
+  pendingLpuId=id;
   const rec=allRecords.find(x=>x.id===id);
-  const nuevo=prompt('Nuevo valor de LPU:',rec&&rec.lpu&&rec.lpu!=='N/A'?rec.lpu:'');
-  if(nuevo===null)return;
+  document.getElementById('lpuInput').value=(rec&&rec.lpu&&rec.lpu!=='N/A')?rec.lpu:'';
+  document.getElementById('lpuModal').classList.add('open');
+  setTimeout(()=>document.getElementById('lpuInput').focus(),50);
+}
+function closeLpuModal(){document.getElementById('lpuModal').classList.remove('open');pendingLpuId=null;}
+async function saveLpu(){
+  if(!pendingLpuId)return;
+  const id=pendingLpuId, nuevo=document.getElementById('lpuInput').value;
+  const btn=document.getElementById('lpuSaveBtn');
+  btn.disabled=true;btn.textContent='Guardando...';
   try{
     const resp=await fetch(`${SERVER}/registro/${id}/lpu`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({lpu:nuevo})});
     const d=await resp.json().catch(()=>({}));
     if(!resp.ok)throw new Error(d.error||'Error al editar LPU');
+    closeLpuModal();
     tigToast('✔ LPU actualizado','ok');
     await loadHist();
-  }catch(e){alert('Error: '+e.message);}
+  }catch(e){tigToast('❌ '+e.message,'err');}
+  finally{btn.disabled=false;btn.textContent='Guardar';}
 }
+document.getElementById('lpuModal').addEventListener('click',function(e){if(e.target===this)closeLpuModal();});
+document.getElementById('lpuInput').addEventListener('keydown',function(e){if(e.key==='Enter')saveLpu();});
 function verInformePdfRecord(id){window.open(`${SERVER}/ver-informe.html?tipo=clima&id=${id}`,'_blank');}
 function openConfirm(id){pendingDeleteId=id;const sitio=(allRecords.find(x=>x.id===id)||{}).nombreSitio||'';document.getElementById('confirmMsg').textContent=`Se eliminará el informe de "${sitio}". Esta acción no se puede deshacer.`;document.getElementById('confirmDel').classList.add('open');}
 function closeConfirm(){document.getElementById('confirmDel').classList.remove('open');pendingDeleteId=null;}
