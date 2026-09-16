@@ -509,6 +509,7 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
     </div>
     <div class="hdr-badges">
       <span class="srv-dot" id="srvBadge" title="Servidor inactivo"></span>
+      <button type="button" class="back-btn" title="Cerrar sesión" aria-label="Cerrar sesión" onclick="doLogout()" style="cursor:pointer;background:none;border:none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
       <a href="/" class="back-btn" title="Inicio" aria-label="Volver al inicio"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></a>
     </div>
   </div>
@@ -1995,10 +1996,12 @@ function renderHist(records){
           <div class="id-row"><div class="id-lbl">Código Sitio</div><div class="id-val">${esc(r.codigoSitio||'—')}</div></div>
           <div class="id-row"><div class="id-lbl">Equipo</div><div class="id-val">${esc(r.equipo||'—')}</div></div>
           <div class="id-row"><div class="id-lbl">Circuito</div><div class="id-val">${esc(r.circuito||'—')}</div></div>
+          <div class="id-row"><div class="id-lbl">LPU</div><div class="id-val">${esc(r.lpu||'—')}</div></div>
         </div>
         <div class="inf-actions">
           <button class="act-btn act-ver" onclick="verInformePdfRecord('${r.id}')">👁 Ver Informe</button>
           <button class="act-btn act-dl" onclick="downloadRecord('${r.id}')">⬇ Descargar</button>
+          ${canEditLpu?`<button class="act-btn act-ver" onclick="editLpu('${r.id}')">✏️ Editar LPU</button>`:''}
           <button class="act-btn act-del" onclick="openConfirm('${r.id}')">🗑️ Borrar</button>
         </div>
       </div>
@@ -2007,6 +2010,18 @@ function renderHist(records){
 }
 function toggleInf(id){document.getElementById(`body_${id}`).classList.toggle('open');}
 async function downloadRecord(id){const a=document.createElement('a');a.href=`${SERVER}/descargar/${id}`;a.click();}
+async function editLpu(id){
+  const rec=allRecords.find(x=>x.id===id);
+  const nuevo=prompt('Nuevo valor de LPU:',rec&&rec.lpu&&rec.lpu!=='N/A'?rec.lpu:'');
+  if(nuevo===null)return;
+  try{
+    const resp=await fetch(`${SERVER}/registro/${id}/lpu`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({lpu:nuevo})});
+    const d=await resp.json().catch(()=>({}));
+    if(!resp.ok)throw new Error(d.error||'Error al editar LPU');
+    tigToast('✔ LPU actualizado','ok');
+    await loadHist();
+  }catch(e){alert('Error: '+e.message);}
+}
 function verInformePdfRecord(id){window.open(`${SERVER}/ver-informe.html?tipo=clima&id=${id}`,'_blank');}
 function openConfirm(id){pendingDeleteId=id;const sitio=(allRecords.find(x=>x.id===id)||{}).nombreSitio||'';document.getElementById('confirmMsg').textContent=`Se eliminará el informe de "${sitio}". Esta acción no se puede deshacer.`;document.getElementById('confirmDel').classList.add('open');}
 function closeConfirm(){document.getElementById('confirmDel').classList.remove('open');pendingDeleteId=null;}
@@ -2172,10 +2187,12 @@ previewCod();checkServer();setInterval(checkServer,15000);
 const _gate=document.getElementById('loginGate');
 function showLogin(){_gate.style.display='flex';}
 function hideLogin(){_gate.style.display='none';}
+let canEditLpu=false;
 async function checkAuth(){
-  try{const r=await fetch(SERVER+'/sesion',{cache:'no-store'});const d=await r.json();if(d.auth){hideLogin();return true;}}catch{}
+  try{const r=await fetch(SERVER+'/sesion',{cache:'no-store'});const d=await r.json();if(d.auth){canEditLpu=!!d.canEditLpu;hideLogin();return true;}}catch{}
   showLogin();return false;
 }
+async function doLogout(){try{await fetch(SERVER+'/logout',{method:'POST'});}catch{}location.reload();}
 document.getElementById('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();
   const btn=document.getElementById('loginBtn'),err=document.getElementById('loginErr');
@@ -2186,7 +2203,7 @@ document.getElementById('loginForm').addEventListener('submit',async e=>{
     const d=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(d.error||'Error al iniciar sesión');
     hideLogin();document.getElementById('loginPass').value='';
-    loadHist(true);loadPapelera(true);
+    await checkAuth();loadHist(true);loadPapelera(true);
   }catch(ex){err.textContent='❌ '+ex.message;err.style.display='block';}
   finally{btn.disabled=false;btn.textContent='Entrar';}
 });

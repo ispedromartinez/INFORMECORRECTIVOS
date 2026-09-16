@@ -9,6 +9,7 @@ const path = require('path');
 const XLSXStyle = require('xlsx-js-style');
 const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
+const JSZip = require('jszip');
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
         ImageRun, AlignmentType, WidthType, BorderStyle, ShadingType,
         VerticalAlign, Header } = require('docx');
@@ -132,20 +133,6 @@ for (const [route, modPath] of [
 ]) {
   app.get(route, (req, res) => res.sendFile(path.join(__dirname, 'node_modules', modPath)));
 }
-// Contrato WOM finalizado: se bloquea todo el módulo (página, API y descargas).
-const WOM_ROUTE_RE = /^\/(wom|actividades-wom|generar-wom|registro-wom|descargar-wom|test-insert-wom)(\/|$)/;
-app.use((req, res, next) => {
-  if (WOM_ROUTE_RE.test(req.path)) {
-    return res.status(403).send(`<!doctype html><meta charset="utf-8">
-      <div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:Arial,sans-serif;background:#f4f4f4">
-        <div style="border:5px solid #C0392B;color:#C0392B;font-weight:800;font-size:34px;letter-spacing:4px;
-                    padding:16px 40px;border-radius:10px;background:#fff;transform:rotate(-8deg);
-                    box-shadow:0 4px 14px rgba(0,0,0,.15)">CONTRATO TERMINADO</div>
-      </div>`);
-  }
-  next();
-});
-
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'selector.html')));
 app.get('/tigo', (req, res) => res.sendFile(path.join(__dirname, 'informe_clima_app.html')));
 app.get('/wom', (req, res) => res.sendFile(path.join(__dirname, 'informe_wom_app.html')));
@@ -259,6 +246,20 @@ function makeRepo({ table, papelera, dbFile, papeleraFile, from, to,
       } else { saveDB(loadDB().filter(r => r.id !== id)); }
       return { ok: true };
     },
+    // Actualización parcial (mismas claves camelCase para JSON local y columnas para Supabase).
+    async update(id, patch) {
+      if (supabase) {
+        const { error } = await supabase.from(table).update(patch).eq('id', id);
+        if (error) { console.error(`${table} update:`, error); return { error: `${table}: ${error.message}` }; }
+        return { ok: true };
+      }
+      const db = loadDB();
+      const idx = db.findIndex(r => r.id === id);
+      if (idx < 0) return { error: 'No encontrado' };
+      Object.assign(db[idx], patch);
+      saveDB(db);
+      return { ok: true };
+    },
     async papList(q) {
       if (supabase) {
         const { data, error } = await supabase.from(papelera).select('*').order(delCol, { ascending: false });
@@ -305,6 +306,7 @@ function makeRepo({ table, papelera, dbFile, papeleraFile, from, to,
 
 // ── Informes + Papelera Clima ──────────────────────────────────
 const { list: dbClimaList, insert: dbClimaInsert, find: dbClimaFind, remove: dbClimaDelete,
+        update: dbClimaUpdate,
         papList: dbPapeleraList, papInsert: dbPapeleraInsert, papFind: dbPapeleraFind,
         papDelete: dbPapeleraDelete, papClear: dbPapeleraClear } = makeRepo({
   table: 'informes_clima', papelera: 'papelera_clima',
@@ -929,17 +931,22 @@ app.get('/ping', (req,res) => res.json({ok:true}));
 const AUTH_USER = (process.env.AUTH_USER || '').trim().toLowerCase();
 const AUTH_PASS = process.env.AUTH_PASS || '';
 const AUTH_CONFIGURED = !!(AUTH_USER && AUTH_PASS);
+// Segundo usuario opcional (rol: editor de LPU en informes Tigo/clima).
+const AUTH_USER2 = (process.env.AUTH_USER2 || '').trim().toLowerCase();
+const AUTH_PASS2 = process.env.AUTH_PASS2 || '';
+const AUTH2_CONFIGURED = !!(AUTH_USER2 && AUTH_PASS2);
 // Secreto para firmar la cookie. Si no se define, se genera uno al arrancar:
 // las sesiones se invalidan en cada redeploy (aceptable). Para sesiones que
 // sobrevivan a reinicios, define SESSION_SECRET en Render.
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 h
 
-function makeToken() {
-  const payload = `${AUTH_USER}|${Date.now() + SESSION_TTL_MS}`;
+function makeToken(user) {
+  const payload = `${user}|${Date.now() + SESSION_TTL_MS}`;
   const sig = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
   return `${Buffer.from(payload).toString('base64url')}.${sig}`;
 }
+// Devuelve el username de la sesión si es válida, o false si no.
 function verifyToken(tok) {
   if (!tok || typeof tok !== 'string') return false;
   const [b64, sig] = tok.split('.');
@@ -949,8 +956,11 @@ function verifyToken(tok) {
   const expected = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
   const a = Buffer.from(sig), b = Buffer.from(expected);
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return false;
-  const exp = parseInt(payload.split('|').pop(), 10);
-  return Number.isFinite(exp) && Date.now() < exp;
+  const idx = payload.lastIndexOf('|');
+  if (idx < 0) return false;
+  const user = payload.slice(0, idx);
+  const exp = parseInt(payload.slice(idx + 1), 10);
+  return (Number.isFinite(exp) && Date.now() < exp) ? user : false;
 }
 function getCookie(req, name) {
   const raw = req.headers.cookie || '';
@@ -966,8 +976,24 @@ function cookieHeader(value, maxAgeSec) {
   return `sesion=${value}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAgeSec}${secure ? '; Secure' : ''}`;
 }
 function requireAuth(req, res, next) {
-  if (verifyToken(getCookie(req, 'sesion'))) return next();
+  const user = verifyToken(getCookie(req, 'sesion'));
+  if (user) { req.authUser = user; return next(); }
   return res.status(401).json({ error: 'No autenticado. Inicia sesión.' });
+}
+// Rol editor: solo el usuario AUTH_USER2 puede editar el LPU de informes ya generados.
+function requireLpuEditor(req, res, next) {
+  const user = verifyToken(getCookie(req, 'sesion'));
+  if (AUTH2_CONFIGURED && user === AUTH_USER2) return next();
+  return res.status(403).json({ error: 'No tienes permiso para editar este campo.' });
+}
+// Compara credenciales contra un par usuario/clave de forma constante en el tiempo.
+function matchCreds(u, pass, envUser, envPass) {
+  if (!envUser || !envPass) return false;
+  const okUser = u.length === envUser.length &&
+    crypto.timingSafeEqual(Buffer.from(u), Buffer.from(envUser));
+  const pa = Buffer.from(String(pass || '')), pb = Buffer.from(envPass);
+  const okPass = pa.length === pb.length && crypto.timingSafeEqual(pa, pb);
+  return okUser && okPass;
 }
 
 app.post('/login', heavyLimiter, (req, res) => {
@@ -976,19 +1002,21 @@ app.post('/login', heavyLimiter, (req, res) => {
   }
   const { usuario, clave } = req.body || {};
   const u = String(usuario || '').trim().toLowerCase();
-  const okUser = u.length === AUTH_USER.length &&
-    crypto.timingSafeEqual(Buffer.from(u), Buffer.from(AUTH_USER));
-  const pa = Buffer.from(String(clave || '')), pb = Buffer.from(AUTH_PASS);
-  const okPass = pa.length === pb.length && crypto.timingSafeEqual(pa, pb);
-  if (!okUser || !okPass) return res.status(401).json({ error: 'Usuario o clave incorrectos.' });
-  res.setHeader('Set-Cookie', cookieHeader(makeToken(), SESSION_TTL_MS / 1000));
+  let matched = null;
+  if (matchCreds(u, clave, AUTH_USER, AUTH_PASS)) matched = AUTH_USER;
+  else if (matchCreds(u, clave, AUTH_USER2, AUTH_PASS2)) matched = AUTH_USER2;
+  if (!matched) return res.status(401).json({ error: 'Usuario o clave incorrectos.' });
+  res.setHeader('Set-Cookie', cookieHeader(makeToken(matched), SESSION_TTL_MS / 1000));
   res.json({ ok: true });
 });
 app.post('/logout', (req, res) => {
   res.setHeader('Set-Cookie', cookieHeader('', 0));
   res.json({ ok: true });
 });
-app.get('/sesion', (req, res) => res.json({ auth: verifyToken(getCookie(req, 'sesion')) }));
+app.get('/sesion', (req, res) => {
+  const user = verifyToken(getCookie(req, 'sesion'));
+  res.json({ auth: !!user, canEditLpu: !!user && AUTH2_CONFIGURED && user === AUTH_USER2 });
+});
 
 // Los endpoints de diagnóstico ejecutan operaciones reales con las claves del
 // servidor (escriben en Supabase, suben al bucket, consumen cuota de Brevo).
@@ -1166,6 +1194,45 @@ app.get('/descargar/:id', async (req,res) => {
   res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.wordprocessingml.document');
   res.setHeader('Content-Disposition',`attachment; filename="${entry.filename}"`);
   res.send(buffer);
+});
+
+// Reemplaza el valor de la celda LPU dentro del .docx ya generado (sin
+// reconstruir todo el documento, que requeriría guardar fotos/observaciones).
+// Asume que la etiqueta "LPU" aparece una sola vez en el template.
+function escapeXml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&apos;' }[c]));
+}
+async function patchLpuDocx(buffer, newLpu) {
+  const zip = await JSZip.loadAsync(buffer);
+  const docPath = 'word/document.xml';
+  const file = zip.file(docPath);
+  if (!file) throw new Error('Documento inválido: falta word/document.xml');
+  let xml = await file.async('string');
+  const value = (newLpu || '').toString().trim() || 'N/A';
+  const re = /(<w:t[^>]*>LPU<\/w:t>[\s\S]*?<w:t[^>]*>)([^<]*)(<\/w:t>)/;
+  if (!re.test(xml)) throw new Error('No se encontró el campo LPU en el documento');
+  xml = xml.replace(re, (_m, pre, _old, post) => pre + escapeXml(value) + post);
+  zip.file(docPath, xml);
+  return { buffer: await zip.generateAsync({ type: 'nodebuffer' }), value };
+}
+
+app.patch('/registro/:id/lpu', requireLpuEditor, async (req, res) => {
+  try {
+    const entry = await dbClimaFind(req.params.id);
+    if (!entry) return res.status(404).json({ error: 'No encontrado' });
+    let buffer = await storageDownload(`clima/${entry.filename}`);
+    const fpath = path.join(DOCS_DIR, entry.filename);
+    if (!buffer) {
+      if (!fs.existsSync(fpath)) return res.status(404).json({ error: 'Archivo no existe' });
+      buffer = fs.readFileSync(fpath);
+    }
+    const { buffer: patched, value } = await patchLpuDocx(buffer, req.body && req.body.lpu);
+    fs.writeFileSync(fpath, patched);
+    await storageUpload(patched, `clima/${entry.filename}`);
+    const upd = await dbClimaUpdate(entry.id, { lpu: value });
+    if (upd && upd.error) return res.status(500).json({ error: upd.error });
+    res.json({ ok: true, lpu: value });
+  } catch (e) { console.error('PATCH /registro/:id/lpu:', e); res.status(500).json({ error: e.message || 'Error al editar LPU' }); }
 });
 
 // El endpoint POST /enviar/:id se eliminó: la UI ya no ofrece envío manual y
