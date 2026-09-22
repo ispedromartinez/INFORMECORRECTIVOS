@@ -1,6 +1,7 @@
 node_modules/
 .env
 informes/
+informes_data/
 papelera/
 registro.json
 papelera.json
@@ -10,6 +11,7 @@ papelera_wom.json
 papelera_wom/
 .bak_predeploy/
 server.log
+server_out.log
 server_err.log
 .claude/
 ref*.xml

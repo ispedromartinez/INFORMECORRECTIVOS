@@ -930,32 +930,6 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
   </div>
 </div>
 
-<div class="confirm-overlay" id="lpuModal">
-  <div class="confirm-box">
-    <div class="confirm-icon">✏️</div>
-    <div class="confirm-title">Editar LPU</div>
-    <div class="confirm-msg">Actualiza el valor de LPU del informe. Se regenerará el Word con el nuevo dato.</div>
-    <input type="text" id="lpuInput" class="lpu-input" placeholder="Ej: LPU-1234" autocomplete="off">
-    <div class="confirm-btns">
-      <button class="cbtn cancel" onclick="closeLpuModal()">Cancelar</button>
-      <button class="cbtn confirm lpu" id="lpuSaveBtn" onclick="saveLpu()">Guardar</button>
-    </div>
-  </div>
-</div>
-
-<div class="confirm-overlay" id="tituloModal">
-  <div class="confirm-box">
-    <div class="confirm-icon">✏️</div>
-    <div class="confirm-title">Editar título de portada</div>
-    <div class="confirm-msg">Actualiza el título de la portada del informe. Se regenerará el Word con el nuevo dato.</div>
-    <input type="text" id="tituloInput" class="lpu-input" placeholder="Ej: INFORME CORRECTIVO CLIMA" autocomplete="off">
-    <div class="confirm-btns">
-      <button class="cbtn cancel" onclick="closeTituloModal()">Cancelar</button>
-      <button class="cbtn confirm lpu" id="tituloSaveBtn" onclick="saveTitulo()">Guardar</button>
-    </div>
-  </div>
-</div>
-
 <div class="confirm-overlay" id="uploadModal">
   <div class="confirm-box" style="max-width:420px;text-align:left">
     <div class="confirm-icon" style="text-align:center">⬆</div>
@@ -1563,6 +1537,7 @@ function nuevoInforme(){
   previewCod();
   document.getElementById('statusMsg').style.display='none';
   lastInformeId=null;
+  editingInformeId=null;editingCodInforme=null;
   document.getElementById('btnVerPdf').style.display='none';
   document.querySelectorAll('.has-error').forEach(el=>el.classList.remove('has-error'));
   unlockedUpTo=1;
@@ -1866,8 +1841,9 @@ async function generateDocx(){
   const btn=document.getElementById('btnDocx');
   btn.disabled=true;genShow();
 
-  // Get final correlative code
-  const cod=await buildCodigoFinal()||'INFORME';
+  // Al editar un informe existente se mantiene el mismo código; si es
+  // nuevo se calcula el correlativo contra el historial.
+  const cod=editingInformeId?editingCodInforme:(await buildCodigoFinal()||'INFORME');
 
   const payload={
     codInforme:cod,fecha:buildFechaRango(),
@@ -1888,18 +1864,23 @@ async function generateDocx(){
     photoDescs:photoDescs
   };
   try{
-    const resp=await fetch(SERVER+'/generar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const editId=editingInformeId;
+    const url=editId?`${SERVER}/registro/${editId}`:SERVER+'/generar';
+    const method=editId?'PUT':'POST';
+    const resp=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     if(!resp.ok){let msg=`Error del servidor: ${resp.status}`;try{const j=await resp.json();if(j&&j.error)msg=j.error;}catch{}throw new Error(msg);}
     const blob=await resp.blob();
     const disp=resp.headers.get('Content-Disposition')||'';
     const fnMatch=disp.match(/filename="(.+)"/);
     const fname=fnMatch?fnMatch[1]:`${cod}.docx`;
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.href=url;a.download=fname;a.click();URL.revokeObjectURL(url);
-    lastInformeId=resp.headers.get('X-Informe-Id');
+    const blobUrl=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=blobUrl;a.download=fname;a.click();URL.revokeObjectURL(blobUrl);
+    lastInformeId=editId||resp.headers.get('X-Informe-Id');
     const _vp=document.getElementById('btnVerPdf'); if(_vp)_vp.style.display=lastInformeId?'block':'none';
+    editingInformeId=null;editingCodInforme=null;
     genSuccess(fname);
     setTimeout(()=>showTab(7),1100);
+    loadHist();
   }catch(err){
     genError(err.message);
   }finally{btn.disabled=false;}
@@ -2188,8 +2169,7 @@ function renderHist(records){
         <div class="inf-actions">
           <button class="act-btn act-ver" onclick="verInformePdfRecord('${r.id}')">👁 Ver Informe</button>
           <button class="act-btn act-dl" onclick="downloadRecord('${r.id}')">⬇ Descargar</button>
-          ${canEditLpu?`<button class="act-btn act-ver" onclick="editLpu('${r.id}')">✏️ Editar LPU</button>`:''}
-          ${canEditLpu&&TITULO_EDITABLE_SITIOS.has(norm(r.nombreSitio||'').toUpperCase())?`<button class="act-btn act-ver" onclick="editTitulo('${r.id}')">✏️ Editar título portada</button>`:''}
+          ${canEditLpu?`<button class="act-btn act-ver" onclick="editInformeCompleto('${r.id}')">✏️ Modo edición</button>`:''}
           <button class="act-btn act-del" onclick="openConfirm('${r.id}')">🗑️ Borrar</button>
         </div>
       </div>
@@ -2198,60 +2178,78 @@ function renderHist(records){
 }
 function toggleInf(id){document.getElementById(`body_${id}`).classList.toggle('open');}
 async function downloadRecord(id){const a=document.createElement('a');a.href=`${SERVER}/descargar/${id}`;a.click();}
-let pendingLpuId=null;
-function editLpu(id){
-  pendingLpuId=id;
-  const rec=allRecords.find(x=>x.id===id);
-  document.getElementById('lpuInput').value=(rec&&rec.lpu&&rec.lpu!=='N/A')?rec.lpu:'';
-  document.getElementById('lpuModal').classList.add('open');
-  setTimeout(()=>document.getElementById('lpuInput').focus(),50);
+// ══ EDITAR INFORME COMPLETO (plmartinez) ══
+// Reabre el formulario de creación con todos los datos del informe ya
+// generado (fotos, mediciones, resumen, etc.) para modificar lo que sea
+// y regenerar el mismo Word, en vez de crear uno nuevo.
+let editingInformeId=null;
+let editingCodInforme=null;
+function setVal(id,v){const el=document.getElementById(id);if(el)el.value=v||'';}
+function toIsoDate(s){
+  if(!s)return'';
+  const p=s.trim().split('-');
+  return p.length===3?`${p[2]}-${p[1]}-${p[0]}`:'';
 }
-function closeLpuModal(){document.getElementById('lpuModal').classList.remove('open');pendingLpuId=null;}
-async function saveLpu(){
-  if(!pendingLpuId)return;
-  const id=pendingLpuId, nuevo=document.getElementById('lpuInput').value;
-  const btn=document.getElementById('lpuSaveBtn');
-  btn.disabled=true;btn.textContent='Guardando...';
+function loadPhotoFromDataUrl(idx,dataUrl,desc){
+  createPhotoSlot(idx);
+  photoFiles[idx]=true;
+  photoDataUrls[idx]=dataUrl;
+  const im=document.getElementById(`img${idx}`);im.src=dataUrl;
+  const sl=document.getElementById(`slot${idx}`);sl.classList.add('filled');
+  const refW=sl.clientWidth||200,refH=sl.clientHeight||150;
+  photoTransforms[idx]={x:0,y:0,scale:1,rot:0,refW,refH};
+  im.style.transform='';
+  document.getElementById('photoTabNum').textContent=photoFiles.filter(Boolean).length;
+  const dEl=document.getElementById(`desc${idx}`);
+  photoDescs[idx]=desc||'';dEl.value=desc||'';dEl.style.display='block';
+  ensureTrailingSlot();
+}
+async function editInformeCompleto(id){
   try{
-    const resp=await fetch(`${SERVER}/registro/${id}/lpu`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({lpu:nuevo})});
-    const d=await resp.json().catch(()=>({}));
-    if(!resp.ok)throw new Error(d.error||'Error al editar LPU');
-    closeLpuModal();
-    tigToast('✔ LPU actualizado','ok');
-    await loadHist();
-  }catch(e){tigToast('❌ '+e.message,'err');}
-  finally{btn.disabled=false;btn.textContent='Guardar';}
-}
-document.getElementById('lpuModal').addEventListener('click',function(e){if(e.target===this)closeLpuModal();});
-document.getElementById('lpuInput').addEventListener('keydown',function(e){if(e.key==='Enter')saveLpu();});
+    const resp=await fetch(`${SERVER}/registro/${id}/datos`);
+    const j=await resp.json().catch(()=>({}));
+    if(!resp.ok)throw new Error(j.error||'No se pudo cargar el informe');
+    const d=j.datos;
+    nuevoInforme();
+    editingInformeId=id;
+    editingCodInforme=d.codInforme;
 
-// Sitios donde se habilita el botón de editar título de portada.
-const TITULO_EDITABLE_SITIOS=new Set(['DATA CENTER SAN MARTIN','DATA CENTER APOQUINDO']);
-let pendingTituloId=null;
-function editTitulo(id){
-  pendingTituloId=id;
-  const rec=allRecords.find(x=>x.id===id);
-  document.getElementById('tituloInput').value=(rec&&rec.nombreSitio)?rec.nombreSitio.toUpperCase():'';
-  document.getElementById('tituloModal').classList.add('open');
-  setTimeout(()=>document.getElementById('tituloInput').focus(),50);
-}
-function closeTituloModal(){document.getElementById('tituloModal').classList.remove('open');pendingTituloId=null;}
-async function saveTitulo(){
-  if(!pendingTituloId)return;
-  const id=pendingTituloId, nuevo=document.getElementById('tituloInput').value;
-  const btn=document.getElementById('tituloSaveBtn');
-  btn.disabled=true;btn.textContent='Guardando...';
-  try{
-    const resp=await fetch(`${SERVER}/registro/${id}/titulo`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({titulo:nuevo})});
-    const d=await resp.json().catch(()=>({}));
-    if(!resp.ok)throw new Error(d.error||'Error al editar título de portada');
-    closeTituloModal();
-    tigToast('✔ Título de portada actualizado','ok');
+    document.getElementById('nombreSitio').value=d.nombreSitio||'';
+    siteInput.value=d.nombreSitio||'';
+    siteInput.classList.toggle('sel',!!d.nombreSitio);
+    siteClear.classList.toggle('show',!!d.nombreSitio);
+    siteCnt.textContent=d.nombreSitio?'✓ Sitio seleccionado':'';
+    setVal('direccion',d.direccion);document.getElementById('addrDisp').textContent=d.direccion||'—';
+    setVal('codigoSitio',d.codigoSitio);
+    setVal('sala',d.sala);
+
+    const[fi,ft]=(d.fecha||'').split(' - ');
+    document.getElementById('fechaEjecucion').value=toIsoDate(fi);
+    document.getElementById('fechaTermino').value=toIsoDate(ft||fi);
+
+    document.getElementById('tecnico').value=d.tecnico||'';
+    tecInput.value=d.tecnico||'';tecInput.classList.toggle('sel',!!d.tecnico);
+    document.getElementById('supervisor').value=d.supervisor||'';
+    supInput.value=d.supervisor||'';supInput.classList.toggle('sel',!!d.supervisor);
+
+    setVal('numOT',d.numOT);setVal('lpu',d.lpu);
+    setVal('ticketInc',d.ticketInc);setVal('ticketTE',d.ticketTE);
+    setVal('ticketTI',d.ticketTI);setVal('ticketRED',d.ticketRED);
+    setVal('resumen',d.resumen);setVal('observaciones',d.observaciones);setVal('tituloPortada',d.tituloPortada);
+
+    setVal('eqNumero',d.equipo);setVal('eqCircuito',d.circuito);
+    setVal('eqTipo',d.eqTipo);if(d.eqTipo)tipoInput.classList.add('sel');
+    setVal('eqMarca',d.eqMarca);if(d.eqMarca)marcaInput.classList.add('sel');
+    setVal('eqModelo',d.eqModelo);
+    ['m_cv','m_ca','m_ev','m_ea','m_condv','m_conda','m_tinj','m_tret'].forEach(k=>setVal(k,d[k]));
+
+    (d.photos||[]).forEach((url,i)=>{if(url)loadPhotoFromDataUrl(i,url,(d.photoDescs&&d.photoDescs[i])||'');});
+
+    toggleTituloPortada();previewCod();updateEstadoActual();buildSummary();
+    tigToast(j.parcial?'⚠️ Este informe es viejo: se leyó lo que se pudo del Word, completá lo que falte (fotos, resumen, mediciones)':'✏️ Modo edición activado — se sobrescribe el mismo informe al guardar','ok');
+    showTab(1);
   }catch(e){tigToast('❌ '+e.message,'err');}
-  finally{btn.disabled=false;btn.textContent='Guardar';}
 }
-document.getElementById('tituloModal').addEventListener('click',function(e){if(e.target===this)closeTituloModal();});
-document.getElementById('tituloInput').addEventListener('keydown',function(e){if(e.key==='Enter')saveTitulo();});
 
 // ══ SUBIR INFORME YA CONFECCIONADO (plmartinez) ══
 // Todos los datos se leen del propio .docx en el servidor

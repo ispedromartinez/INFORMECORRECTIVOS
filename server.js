@@ -142,9 +142,11 @@ const DOCS_DIR      = path.join(__dirname, 'informes');
 const PAPELERA_DIR  = path.join(__dirname, 'papelera');
 const DB_FILE       = path.join(__dirname, 'registro.json');
 const PAPELERA_FILE = path.join(__dirname, 'papelera.json');
+const DATOS_DIR     = path.join(__dirname, 'informes_data');
 
 if (!fs.existsSync(DOCS_DIR))     fs.mkdirSync(DOCS_DIR);
 if (!fs.existsSync(PAPELERA_DIR)) fs.mkdirSync(PAPELERA_DIR);
+if (!fs.existsSync(DATOS_DIR))    fs.mkdirSync(DATOS_DIR);
 if (!fs.existsSync(DB_FILE))      fs.writeFileSync(DB_FILE, '[]');
 if (!fs.existsSync(PAPELERA_FILE))fs.writeFileSync(PAPELERA_FILE, '[]');
 
@@ -1157,6 +1159,7 @@ app.post('/generar', heavyLimiter, async (req,res) => {
       filename: fname
     };
     await dbClimaInsert(entry);
+    guardarDatosCompletos(entry.id, d);
 
     // Auto-envío por correo (fire-and-forget: no retrasa la descarga)
     autoEnviarInforme({
@@ -1178,7 +1181,8 @@ app.post('/generar', heavyLimiter, async (req,res) => {
 
 app.get('/registro', async (req,res) => {
   const q = (req.query.q||'').toLowerCase().trim();
-  res.json(await dbClimaList(q || null));
+  const lista = await dbClimaList(q || null);
+  res.json(lista.map(r => ({ ...r, hasDatos: fs.existsSync(datosPath(r.id)) })));
 });
 
 app.get('/descargar/:id', async (req,res) => {
@@ -1195,86 +1199,79 @@ app.get('/descargar/:id', async (req,res) => {
   res.send(buffer);
 });
 
-// Reemplaza el valor de la celda LPU dentro del .docx ya generado (sin
-// reconstruir todo el documento, que requeriría guardar fotos/observaciones).
-// Asume que la etiqueta "LPU" aparece una sola vez en el template.
-function escapeXml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&apos;' }[c]));
+// Guarda/lee el payload completo con el que se generó un informe (fotos,
+// resumen, mediciones, observaciones, etc.), para poder reabrirlo en el
+// formulario de creación y regenerarlo entero al editar.
+function datosPath(id) { return path.join(DATOS_DIR, `${id}.json`); }
+function guardarDatosCompletos(id, d) {
+  try { fs.writeFileSync(datosPath(id), JSON.stringify(d)); } catch (e) { console.error('guardarDatosCompletos:', e); }
 }
-async function patchLpuDocx(buffer, newLpu) {
-  const zip = await JSZip.loadAsync(buffer);
-  const docPath = 'word/document.xml';
-  const file = zip.file(docPath);
-  if (!file) throw new Error('Documento inválido: falta word/document.xml');
-  let xml = await file.async('string');
-  const value = (newLpu || '').toString().trim() || 'N/A';
-  const re = /(<w:t[^>]*>LPU<\/w:t>[\s\S]*?<w:t[^>]*>)([^<]*)(<\/w:t>)/;
-  if (!re.test(xml)) throw new Error('No se encontró el campo LPU en el documento');
-  xml = xml.replace(re, (_m, pre, _old, post) => pre + escapeXml(value) + post);
-  zip.file(docPath, xml);
-  return { buffer: await zip.generateAsync({ type: 'nodebuffer' }), value };
+function leerDatosCompletos(id) {
+  const fpath = datosPath(id);
+  if (!fs.existsSync(fpath)) return null;
+  try { return JSON.parse(fs.readFileSync(fpath, 'utf8')); } catch (e) { console.error('leerDatosCompletos:', e); return null; }
 }
 
-app.patch('/registro/:id/lpu', requireLpuEditor, async (req, res) => {
+// Si el informe no tiene el JSON completo guardado (generado antes de esta
+// función, o subido con "subir informe"), se arma lo que se pueda leyendo
+// el propio .docx (extractClimaFieldsFromDocx) más lo que haya en el
+// registro. Faltan fotos/resumen/mediciones/observaciones: quedan vacíos
+// para que el usuario los complete al editar.
+async function datosParaEditar(entry) {
+  const completos = leerDatosCompletos(entry.id);
+  if (completos) return { datos: completos, parcial: false };
+  let buffer = await storageDownload(`clima/${entry.filename}`);
+  const fpath = path.join(DOCS_DIR, entry.filename);
+  if (!buffer) {
+    if (!fs.existsSync(fpath)) return null;
+    buffer = fs.readFileSync(fpath);
+  }
+  const extraidos = await extractClimaFieldsFromDocx(buffer);
+  return {
+    datos: {
+      ...extraidos,
+      direccion: entry.direccion || '', sala: entry.sala || '',
+      resumen: '', observaciones: '', tituloPortada: '', eqModelo: '',
+      m_cv:'', m_ca:'', m_ev:'', m_ea:'', m_condv:'', m_conda:'', m_tinj:'', m_tret:'',
+      ticketTE:'', ticketTI:'', ticketRED:'',
+      photos: [], photoDescs: []
+    },
+    parcial: true
+  };
+}
+
+app.get('/registro/:id/datos', requireLpuEditor, async (req, res) => {
   try {
     const entry = await dbClimaFind(req.params.id);
     if (!entry) return res.status(404).json({ error: 'No encontrado' });
-    let buffer = await storageDownload(`clima/${entry.filename}`);
-    const fpath = path.join(DOCS_DIR, entry.filename);
-    if (!buffer) {
-      if (!fs.existsSync(fpath)) return res.status(404).json({ error: 'Archivo no existe' });
-      buffer = fs.readFileSync(fpath);
-    }
-    const { buffer: patched, value } = await patchLpuDocx(buffer, req.body && req.body.lpu);
-    fs.writeFileSync(fpath, patched);
-    await storageUpload(patched, `clima/${entry.filename}`);
-    const upd = await dbClimaUpdate(entry.id, { lpu: value });
-    if (upd && upd.error) return res.status(500).json({ error: upd.error });
-    res.json({ ok: true, lpu: value });
-  } catch (e) { console.error('PATCH /registro/:id/lpu:', e); res.status(500).json({ error: e.message || 'Error al editar LPU' }); }
+    const r = await datosParaEditar(entry);
+    if (!r) return res.status(404).json({ error: 'Archivo no existe' });
+    res.json({ ok: true, datos: r.datos, parcial: r.parcial });
+  } catch (e) { console.error('GET /registro/:id/datos:', e); res.status(500).json({ error: e.message || 'Error al leer el informe' }); }
 });
 
-// Reemplaza el texto del título de portada (línea grande con el nombre del
-// sitio, ej. "DATA CENTER SAN MARTIN") dentro del .docx ya generado. Ese
-// texto es el único run de la portada con color COVER_BLUE (1F497D) y
-// tamaño 32 (ver coverLine(sitioNorm, { size: 32 }) al generar el informe),
-// lo que lo distingue del mismo nombre de sitio que aparece en la tabla
-// "Nombre de Sitio" del cuerpo del informe.
-async function patchTituloDocx(buffer, newTitulo, fallback) {
-  const zip = await JSZip.loadAsync(buffer);
-  const docPath = 'word/document.xml';
-  const file = zip.file(docPath);
-  if (!file) throw new Error('Documento inválido: falta word/document.xml');
-  let xml = await file.async('string');
-  const value = (newTitulo || '').toString().trim() || (fallback || '').toString().trim();
-  if (!value) throw new Error('El título de portada no puede estar vacío');
-  const re = /(<w:r>(?:(?!<\/w:r>)[\s\S])*?<w:color w:val="1F497D"\/>(?:(?!<\/w:r>)[\s\S])*?<w:sz w:val="32"\/>(?:(?!<\/w:r>)[\s\S])*?<w:t[^>]*>)([^<]*)(<\/w:t>)/;
-  if (!re.test(xml)) throw new Error('No se encontró el título de portada en el documento');
-  xml = xml.replace(re, (_m, pre, _old, post) => pre + escapeXml(value) + post);
-  zip.file(docPath, xml);
-  return { buffer: await zip.generateAsync({ type: 'nodebuffer' }), value };
-}
-// Sitios donde plmartinez puede editar el título de portada.
-const TITULO_EDITABLE_SITIOS = new Set(['DATA CENTER SAN MARTIN', 'DATA CENTER APOQUINDO']);
-app.patch('/registro/:id/titulo', requireLpuEditor, async (req, res) => {
+app.put('/registro/:id', requireLpuEditor, async (req, res) => {
   try {
     const entry = await dbClimaFind(req.params.id);
     if (!entry) return res.status(404).json({ error: 'No encontrado' });
-    const sitio = (entry.nombreSitio || '').trim().toUpperCase();
-    if (!TITULO_EDITABLE_SITIOS.has(sitio)) {
-      return res.status(403).json({ error: 'El título de portada solo se puede editar en informes de Data Center San Martín o Data Center Apoquindo.' });
-    }
-    let buffer = await storageDownload(`clima/${entry.filename}`);
-    const fpath = path.join(DOCS_DIR, entry.filename);
-    if (!buffer) {
-      if (!fs.existsSync(fpath)) return res.status(404).json({ error: 'Archivo no existe' });
-      buffer = fs.readFileSync(fpath);
-    }
-    const { buffer: patched, value } = await patchTituloDocx(buffer, req.body && req.body.titulo, sitio);
-    fs.writeFileSync(fpath, patched);
-    await storageUpload(patched, `clima/${entry.filename}`);
-    res.json({ ok: true, titulo: value });
-  } catch (e) { console.error('PATCH /registro/:id/titulo:', e); res.status(500).json({ error: e.message || 'Error al editar título de portada' }); }
+    const d = req.body;
+    const buffer = await buildDocx(d);
+    fs.writeFileSync(path.join(DOCS_DIR, entry.filename), buffer);
+    await storageUpload(buffer, `clima/${entry.filename}`);
+    guardarDatosCompletos(entry.id, d);
+    const upd = await dbClimaUpdate(entry.id, {
+      fecha: d.fecha, codInforme: d.codInforme, nombreSitio: d.nombreSitio,
+      codigoSitio: d.codigoSitio, tecnico: d.tecnico, supervisor: d.supervisor,
+      numOT: d.numOT, lpu: d.lpu, inc: d.ticketInc,
+      equipo: d.equipo, circuito: d.circuito,
+      tipoEquipo: d.eqTipo, marca: d.eqMarca,
+      photoCount: (d.photos || []).filter(Boolean).length
+    });
+    if (upd && upd.error) return res.status(500).json({ error: upd.error });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${entry.filename}"`);
+    res.send(buffer);
+  } catch (e) { console.error('PUT /registro/:id:', e); res.status(500).json({ error: e.message || 'Error al actualizar el informe' }); }
 });
 
 // Lee todos los <w:t>texto</w:t> de un XML de Word, en orden de aparición.
