@@ -249,10 +249,15 @@ function makeRepo({ table, papelera, dbFile, papeleraFile, from, to,
       } else { saveDB(loadDB().filter(r => r.id !== id)); }
       return { ok: true };
     },
-    // Actualización parcial (mismas claves camelCase para JSON local y columnas para Supabase).
+    // Actualización parcial: el patch siempre va en claves camelCase (igual
+    // que insert/list); para Supabase se convierte a columnas snake_case
+    // con `to()` y se descartan las claves no incluidas en el patch (to()
+    // devuelve undefined para lo que falta en un objeto parcial).
     async update(id, patch) {
       if (supabase) {
-        const { error } = await supabase.from(table).update(patch).eq('id', id);
+        const mapped = to(patch);
+        const cleaned = Object.fromEntries(Object.entries(mapped).filter(([, v]) => v !== undefined));
+        const { error } = await supabase.from(table).update(cleaned).eq('id', id);
         if (error) { console.error(`${table} update:`, error); return { error: `${table}: ${error.message}` }; }
         return { ok: true };
       }
