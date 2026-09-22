@@ -1236,6 +1236,45 @@ app.patch('/registro/:id/lpu', requireLpuEditor, async (req, res) => {
   } catch (e) { console.error('PATCH /registro/:id/lpu:', e); res.status(500).json({ error: e.message || 'Error al editar LPU' }); }
 });
 
+// Reemplaza el texto de la celda de título de portada ("INFORME CORRECTIVO
+// CLIMA") dentro del .docx ya generado. Solo habilitado para los sitios Data
+// Center San Martín y Data Center Apoquindo (ver /registro/:id/titulo abajo).
+async function patchTituloDocx(buffer, newTitulo) {
+  const zip = await JSZip.loadAsync(buffer);
+  const docPath = 'word/document.xml';
+  const file = zip.file(docPath);
+  if (!file) throw new Error('Documento inválido: falta word/document.xml');
+  let xml = await file.async('string');
+  const value = (newTitulo || '').toString().trim() || 'INFORME CORRECTIVO CLIMA';
+  const re = /(<w:t[^>]*>)INFORME CORRECTIVO CLIMA(<\/w:t>)/;
+  if (!re.test(xml)) throw new Error('No se encontró el título de portada en el documento');
+  xml = xml.replace(re, (_m, pre, post) => pre + escapeXml(value) + post);
+  zip.file(docPath, xml);
+  return { buffer: await zip.generateAsync({ type: 'nodebuffer' }), value };
+}
+// Sitios donde plmartinez puede editar el título de portada.
+const TITULO_EDITABLE_SITIOS = new Set(['DATA CENTER SAN MARTIN', 'DATA CENTER APOQUINDO']);
+app.patch('/registro/:id/titulo', requireLpuEditor, async (req, res) => {
+  try {
+    const entry = await dbClimaFind(req.params.id);
+    if (!entry) return res.status(404).json({ error: 'No encontrado' });
+    const sitio = (entry.nombreSitio || '').trim().toUpperCase();
+    if (!TITULO_EDITABLE_SITIOS.has(sitio)) {
+      return res.status(403).json({ error: 'El título de portada solo se puede editar en informes de Data Center San Martín o Data Center Apoquindo.' });
+    }
+    let buffer = await storageDownload(`clima/${entry.filename}`);
+    const fpath = path.join(DOCS_DIR, entry.filename);
+    if (!buffer) {
+      if (!fs.existsSync(fpath)) return res.status(404).json({ error: 'Archivo no existe' });
+      buffer = fs.readFileSync(fpath);
+    }
+    const { buffer: patched, value } = await patchTituloDocx(buffer, req.body && req.body.titulo);
+    fs.writeFileSync(fpath, patched);
+    await storageUpload(patched, `clima/${entry.filename}`);
+    res.json({ ok: true, titulo: value });
+  } catch (e) { console.error('PATCH /registro/:id/titulo:', e); res.status(500).json({ error: e.message || 'Error al editar título de portada' }); }
+});
+
 // El endpoint POST /enviar/:id se eliminó: la UI ya no ofrece envío manual y
 // aceptaba cualquier destinatario, lo que permitía usar la cuenta de correo
 // (Brevo) para spam. El auto-envío a MAIL_TO en /generar sigue vigente.

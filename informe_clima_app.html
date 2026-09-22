@@ -938,6 +938,19 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
   </div>
 </div>
 
+<div class="confirm-overlay" id="tituloModal">
+  <div class="confirm-box">
+    <div class="confirm-icon">✏️</div>
+    <div class="confirm-title">Editar título de portada</div>
+    <div class="confirm-msg">Actualiza el título de la portada del informe. Se regenerará el Word con el nuevo dato.</div>
+    <input type="text" id="tituloInput" class="lpu-input" placeholder="Ej: INFORME CORRECTIVO CLIMA" autocomplete="off">
+    <div class="confirm-btns">
+      <button class="cbtn cancel" onclick="closeTituloModal()">Cancelar</button>
+      <button class="cbtn confirm lpu" id="tituloSaveBtn" onclick="saveTitulo()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- OVERLAY DE GENERACIÓN -->
 <div class="gen-overlay" id="genOverlay">
   <div class="gen-card" id="genCard">
@@ -2150,6 +2163,7 @@ function renderHist(records){
           <button class="act-btn act-ver" onclick="verInformePdfRecord('${r.id}')">👁 Ver Informe</button>
           <button class="act-btn act-dl" onclick="downloadRecord('${r.id}')">⬇ Descargar</button>
           ${canEditLpu?`<button class="act-btn act-ver" onclick="editLpu('${r.id}')">✏️ Editar LPU</button>`:''}
+          ${canEditLpu&&TITULO_EDITABLE_SITIOS.has(norm(r.nombreSitio||'').toUpperCase())?`<button class="act-btn act-ver" onclick="editTitulo('${r.id}')">✏️ Editar título portada</button>`:''}
           <button class="act-btn act-del" onclick="openConfirm('${r.id}')">🗑️ Borrar</button>
         </div>
       </div>
@@ -2184,6 +2198,33 @@ async function saveLpu(){
 }
 document.getElementById('lpuModal').addEventListener('click',function(e){if(e.target===this)closeLpuModal();});
 document.getElementById('lpuInput').addEventListener('keydown',function(e){if(e.key==='Enter')saveLpu();});
+
+// Sitios donde se habilita el botón de editar título de portada.
+const TITULO_EDITABLE_SITIOS=new Set(['DATA CENTER SAN MARTIN','DATA CENTER APOQUINDO']);
+let pendingTituloId=null;
+function editTitulo(id){
+  pendingTituloId=id;
+  document.getElementById('tituloInput').value='INFORME CORRECTIVO CLIMA';
+  document.getElementById('tituloModal').classList.add('open');
+  setTimeout(()=>document.getElementById('tituloInput').focus(),50);
+}
+function closeTituloModal(){document.getElementById('tituloModal').classList.remove('open');pendingTituloId=null;}
+async function saveTitulo(){
+  if(!pendingTituloId)return;
+  const id=pendingTituloId, nuevo=document.getElementById('tituloInput').value;
+  const btn=document.getElementById('tituloSaveBtn');
+  btn.disabled=true;btn.textContent='Guardando...';
+  try{
+    const resp=await fetch(`${SERVER}/registro/${id}/titulo`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({titulo:nuevo})});
+    const d=await resp.json().catch(()=>({}));
+    if(!resp.ok)throw new Error(d.error||'Error al editar título de portada');
+    closeTituloModal();
+    tigToast('✔ Título de portada actualizado','ok');
+  }catch(e){tigToast('❌ '+e.message,'err');}
+  finally{btn.disabled=false;btn.textContent='Guardar';}
+}
+document.getElementById('tituloModal').addEventListener('click',function(e){if(e.target===this)closeTituloModal();});
+document.getElementById('tituloInput').addEventListener('keydown',function(e){if(e.key==='Enter')saveTitulo();});
 function verInformePdfRecord(id){window.open(`${SERVER}/ver-informe.html?tipo=clima&id=${id}`,'_blank');}
 function openConfirm(id){pendingDeleteId=id;const sitio=(allRecords.find(x=>x.id===id)||{}).nombreSitio||'';document.getElementById('confirmMsg').textContent=`Se eliminará el informe de "${sitio}". Esta acción no se puede deshacer.`;document.getElementById('confirmDel').classList.add('open');}
 function closeConfirm(){document.getElementById('confirmDel').classList.remove('open');pendingDeleteId=null;}
