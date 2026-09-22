@@ -2313,6 +2313,8 @@ async function recontarFotos(id){
 function openUploadModal(){
   document.getElementById('up_file').value='';
   document.getElementById('uploadPreview').style.display='none';
+  const btn=document.getElementById('uploadSaveBtn');
+  btn.disabled=false;btn.textContent='Subir';
   document.getElementById('uploadModal').classList.add('open');
 }
 function closeUploadModal(){document.getElementById('uploadModal').classList.remove('open');}
@@ -2325,12 +2327,15 @@ function readFileAsBase64(file){
     reader.readAsDataURL(file);
   });
 }
+let uploadBusy=false;
 async function submitUpload(){
-  const file=document.getElementById('up_file').files[0];
+  if(uploadBusy)return;
+  const fileInput=document.getElementById('up_file');
+  const file=fileInput.files[0];
   if(!file){tigToast('❌ Selecciona un archivo .docx','err');return;}
   if(!/\.docx$/i.test(file.name)){tigToast('❌ El archivo debe ser .docx','err');return;}
   const btn=document.getElementById('uploadSaveBtn');
-  btn.disabled=true;btn.textContent='Leyendo y subiendo...';
+  uploadBusy=true;btn.disabled=true;btn.textContent='Leyendo y subiendo...';
   try{
     const fileBase64=await readFileAsBase64(file);
     const resp=await fetch(`${SERVER}/registro/subir`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileName:file.name,fileBase64})});
@@ -2342,9 +2347,14 @@ async function submitUpload(){
     prev.innerHTML=`<strong>✔ Agregado con estos datos leídos del documento:</strong><br>Sitio: ${esc(c.nombreSitio||'—')}<br>Código informe: ${esc(c.codInforme||'—')}<br>Fecha: ${esc(c.fecha||'—')}<br>Técnico: ${esc(c.tecnico||'—')}`;
     tigToast('✔ Informe agregado al historial','ok');
     loadHist(true);
+    fileInput.value='';
+    btn.textContent='✔ Subido';
     setTimeout(closeUploadModal,2000);
-  }catch(e){tigToast('❌ '+e.message,'err');}
-  finally{btn.disabled=false;btn.textContent='Subir';}
+    return;
+  }catch(e){
+    tigToast('❌ '+e.message,'err');
+    btn.disabled=false;btn.textContent='Subir';
+  }finally{uploadBusy=false;}
 }
 function verInformePdfRecord(id){window.open(`${SERVER}/ver-informe.html?tipo=clima&id=${id}`,'_blank');}
 function openConfirm(id){pendingDeleteId=id;const sitio=(allRecords.find(x=>x.id===id)||{}).nombreSitio||'';document.getElementById('confirmMsg').textContent=`Se eliminará el informe de "${sitio}". Esta acción no se puede deshacer.`;document.getElementById('confirmDel').classList.add('open');}
