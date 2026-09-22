@@ -1908,13 +1908,15 @@ async function generateDocx(){
     const disp=resp.headers.get('Content-Disposition')||'';
     const fnMatch=disp.match(/filename="(.+)"/);
     const fname=fnMatch?fnMatch[1]:`${cod}.docx`;
-    const blobUrl=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.href=blobUrl;a.download=fname;a.click();URL.revokeObjectURL(blobUrl);
+    if(!editId){
+      const blobUrl=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=blobUrl;a.download=fname;a.click();URL.revokeObjectURL(blobUrl);
+    }
     lastInformeId=editId||resp.headers.get('X-Informe-Id');
     const _vp=document.getElementById('btnVerPdf'); if(_vp)_vp.style.display=lastInformeId?'block':'none';
     editingInformeId=null;editingCodInforme=null;
     document.getElementById('editSaveBar').style.display='none';
-    genSuccess(fname);
+    genSuccess(editId?'Informe actualizado':fname);
     setTimeout(()=>showTab(7),1100);
     loadHist();
   }catch(err){
