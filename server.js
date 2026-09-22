@@ -1230,10 +1230,10 @@ async function datosParaEditar(entry) {
   return {
     datos: {
       ...extraidos,
-      direccion: entry.direccion || '', sala: extraidos.eqSala || entry.sala || '',
-      resumen: '', observaciones: '', tituloPortada: '',
-      m_cv:'', m_ca:'', m_ev:'', m_ea:'', m_condv:'', m_conda:'', m_tinj:'', m_tret:'',
-      ticketTE:'', ticketTI:'', ticketRED:'',
+      direccion: extraidos.direccion || entry.direccion || '',
+      sala: extraidos.eqSala || entry.sala || '',
+      tituloPortada: '',
+      ticketTE: '', ticketTI: '', ticketRED: '',
       photos: [], photoDescs: []
     },
     parcial: true
@@ -1299,11 +1299,14 @@ async function extractClimaFieldsFromDocx(buffer) {
     codInforme: after(headerTexts, 'COD.'),
     nombreSitio: after(docTexts, 'Nombre de Sitio'),
     codigoSitio: after(docTexts, 'Código de Sitio'),
+    direccion: after(docTexts, 'Dirección'),
     lpu: after(docTexts, 'LPU'),
     fecha: after(docTexts, 'Fecha Ejecución'),
     tecnico: after(docTexts, 'Técnico Ejecutante'),
     supervisor: after(docTexts, 'Supervisor'),
-    inc: '', numOT: '', equipo: '', circuito: '', tipoEquipo: '', marca: '', eqSala: '', eqModelo: ''
+    observaciones: after(docTexts, 'OBSERVACIONES Y RECOMENDACIONES'),
+    inc: '', numOT: '', equipo: '', circuito: '', tipoEquipo: '', marca: '', eqSala: '', eqModelo: '',
+    resumen: '', m_cv: '', m_ca: '', m_ev: '', m_ea: '', m_condv: '', m_conda: '', m_tinj: '', m_tret: ''
   };
 
   const idxTk = docTexts.indexOf('Números de Tickets');
@@ -1320,6 +1323,21 @@ async function extractClimaFieldsFromDocx(buffer) {
     out.eqModelo = clean(docTexts[idxEq + 10]);
     const m = eqCombinado.match(/^E(\S*)(?:\s+C(\S*))?$/i);
     if (m) { out.equipo = m[1] || ''; out.circuito = m[2] || ''; }
+  }
+  const idxRs = docTexts.indexOf('RESUMEN DE LA ACTIVIDAD');
+  if (idxRs >= 0 && idxEq > idxRs) {
+    out.resumen = docTexts.slice(idxRs + 1, idxEq).filter(t => t && t !== 'N/A').join(' ');
+  }
+  const idxMed = docTexts.indexOf('MEDICIONES GENERALES');
+  if (idxMed >= 0) {
+    out.m_cv = clean(docTexts[idxMed + 15]);
+    out.m_ca = clean(docTexts[idxMed + 16]);
+    out.m_ev = clean(docTexts[idxMed + 17]);
+    out.m_ea = clean(docTexts[idxMed + 18]);
+    out.m_condv = clean(docTexts[idxMed + 19]);
+    out.m_conda = clean(docTexts[idxMed + 20]);
+    out.m_tinj = clean(docTexts[idxMed + 21]);
+    out.m_tret = clean(docTexts[idxMed + 22]);
   }
   if (!out.codInforme && !out.nombreSitio) {
     throw new Error('No se pudo leer el informe: no tiene el formato de esta aplicación (¿es un .docx de otro origen?).');
