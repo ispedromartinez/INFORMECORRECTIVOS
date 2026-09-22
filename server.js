@@ -1350,6 +1350,20 @@ async function extractClimaFieldsFromDocx(buffer) {
   return out;
 }
 
+// Cuenta las fotos reales del informe (imágenes embebidas dentro de la
+// tabla "REGISTRO FOTOGRAFICO"), no logos ni imágenes de portada que
+// aparecen antes en el documento.
+async function countPhotosInDocx(buffer) {
+  const zip = await JSZip.loadAsync(buffer);
+  const docFile = zip.file('word/document.xml');
+  if (!docFile) return 0;
+  const xml = await docFile.async('string');
+  const idx = xml.indexOf('REGISTRO FOTOGRAFICO');
+  if (idx < 0) return 0;
+  const blips = xml.slice(idx).match(/<a:blip r:embed="rId\d+"/g);
+  return blips ? blips.length : 0;
+}
+
 // Sube un informe .docx ya confeccionado con esta misma aplicación y lo
 // agrega al historial. Todos los metadatos se leen del propio documento
 // (ver extractClimaFieldsFromDocx); no regenera ni modifica su contenido,
@@ -1364,6 +1378,7 @@ app.post('/registro/subir', requireLpuEditor, async (req, res) => {
     if (buffer.slice(0, 2).toString('ascii') !== 'PK') return res.status(400).json({ error: 'El archivo no es un .docx válido.' });
 
     const fields = await extractClimaFieldsFromDocx(buffer);
+    const photoCount = await countPhotosInDocx(buffer);
 
     const base = sanitizeFnamePart(d.fileName.replace(/\.docx$/i, ''), 80) || `Informe-${Date.now()}`;
     let fname = `${base}.docx`;
@@ -1381,13 +1396,33 @@ app.post('/registro/subir', requireLpuEditor, async (req, res) => {
       lpu: fields.lpu, inc: fields.inc,
       equipo: fields.equipo, circuito: fields.circuito,
       tipoEquipo: fields.tipoEquipo, marca: fields.marca,
-      photoCount: 0,
+      photoCount,
       filename: fname
     };
     const ins = await dbClimaInsert(entry);
     if (ins && ins.error) return res.status(500).json({ error: ins.error });
     res.json({ ok: true, id: entry.id, campos: fields });
   } catch (e) { console.error('POST /registro/subir:', e); res.status(500).json({ error: e.message || 'Error al subir el informe' }); }
+});
+
+// Recalcula la cantidad de fotos leyendo el .docx real, para corregir
+// informes que quedaron con "0 fotos" (por ejemplo, subidos antes de que
+// /registro/subir contara las fotos embebidas).
+app.post('/registro/:id/recontar-fotos', requireLpuEditor, async (req, res) => {
+  try {
+    const entry = await dbClimaFind(req.params.id);
+    if (!entry) return res.status(404).json({ error: 'No encontrado' });
+    let buffer = await storageDownload(`clima/${entry.filename}`);
+    const fpath = path.join(DOCS_DIR, entry.filename);
+    if (!buffer) {
+      if (!fs.existsSync(fpath)) return res.status(404).json({ error: 'Archivo no existe' });
+      buffer = fs.readFileSync(fpath);
+    }
+    const photoCount = await countPhotosInDocx(buffer);
+    const upd = await dbClimaUpdate(entry.id, { photoCount });
+    if (upd && upd.error) return res.status(500).json({ error: upd.error });
+    res.json({ ok: true, photoCount });
+  } catch (e) { console.error('POST /registro/:id/recontar-fotos:', e); res.status(500).json({ error: e.message || 'Error al recontar fotos' }); }
 });
 
 // El endpoint POST /enviar/:id se eliminó: la UI ya no ofrece envío manual y

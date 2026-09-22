@@ -2208,6 +2208,7 @@ function renderHist(records){
           <button class="act-btn act-ver" onclick="verInformePdfRecord('${r.id}')">👁 Ver Informe</button>
           <button class="act-btn act-dl" onclick="downloadRecord('${r.id}')">⬇ Descargar</button>
           ${canEditLpu?`<button class="act-btn act-ver" onclick="editInformeCompleto('${r.id}')">✏️ Modo edición</button>`:''}
+          ${canEditLpu?`<button class="act-btn act-ver" onclick="recontarFotos('${r.id}')">🔁 Recontar fotos</button>`:''}
           <button class="act-btn act-del" onclick="openConfirm('${r.id}')">🗑️ Borrar</button>
         </div>
       </div>
@@ -2295,6 +2296,15 @@ async function editInformeCompleto(id){
 function cancelarEdicion(){
   nuevoInforme();
   tigToast('Edición cancelada','ok');
+}
+async function recontarFotos(id){
+  try{
+    const resp=await fetch(`${SERVER}/registro/${id}/recontar-fotos`,{method:'POST'});
+    const j=await resp.json().catch(()=>({}));
+    if(!resp.ok)throw new Error(j.error||'No se pudo recontar');
+    tigToast(`✔ ${j.photoCount} foto${j.photoCount!==1?'s':''} en el informe`,'ok');
+    await loadHist();
+  }catch(e){tigToast('❌ '+e.message,'err');}
 }
 
 // ══ SUBIR INFORME YA CONFECCIONADO (plmartinez) ══
