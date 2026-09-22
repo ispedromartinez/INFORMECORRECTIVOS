@@ -142,15 +142,11 @@ const DOCS_DIR      = path.join(__dirname, 'informes');
 const PAPELERA_DIR  = path.join(__dirname, 'papelera');
 const DB_FILE       = path.join(__dirname, 'registro.json');
 const PAPELERA_FILE = path.join(__dirname, 'papelera.json');
-// Payload crudo (todos los campos + fotos) de cada informe Clima, guardado
-// aparte del .docx para poder reabrirlo y editarlo completo más tarde.
-const RAW_DIR_CLIMA = path.join(__dirname, 'informes_data');
 
 if (!fs.existsSync(DOCS_DIR))     fs.mkdirSync(DOCS_DIR);
 if (!fs.existsSync(PAPELERA_DIR)) fs.mkdirSync(PAPELERA_DIR);
 if (!fs.existsSync(DB_FILE))      fs.writeFileSync(DB_FILE, '[]');
 if (!fs.existsSync(PAPELERA_FILE))fs.writeFileSync(PAPELERA_FILE, '[]');
-if (!fs.existsSync(RAW_DIR_CLIMA))fs.mkdirSync(RAW_DIR_CLIMA);
 
 // ── Row mappers – Clima ────────────────────────────────────────
 const fromClima = r => ({
@@ -200,20 +196,6 @@ async function storageRemove(paths) {
   if (!supabase) return;
   const { error } = await supabase.storage.from(SUPABASE_BUCKET).remove(paths);
   if (error) console.error('storageRemove error:', error.message);
-}
-
-// ── Payload crudo de informes Clima (para edición completa posterior) ──
-async function saveRawDataClima(id, data) {
-  const buf = Buffer.from(JSON.stringify(data));
-  try { fs.writeFileSync(path.join(RAW_DIR_CLIMA, `${id}.json`), buf); } catch (e) { console.error('saveRawDataClima (disco):', e.message); }
-  await storageUpload(buf, `clima-data/${id}.json`, 'application/json');
-}
-async function loadRawDataClima(id) {
-  const remote = await storageDownload(`clima-data/${id}.json`);
-  if (remote) { try { return JSON.parse(remote.toString('utf8')); } catch (e) { console.error('loadRawDataClima (remoto):', e.message); } }
-  const fpath = path.join(RAW_DIR_CLIMA, `${id}.json`);
-  if (fs.existsSync(fpath)) { try { return JSON.parse(fs.readFileSync(fpath, 'utf8')); } catch (e) { console.error('loadRawDataClima (disco):', e.message); } }
-  return null;
 }
 
 // ── Repositorio genérico (Supabase + fallback local JSON) ──────
@@ -335,27 +317,6 @@ const { list: dbClimaList, insert: dbClimaInsert, find: dbClimaFind, remove: dbC
   papSearchFields: ['nombreSitio', 'codInforme', 'tecnico'],
   delCol: 'fecha_eliminado', delKey: 'fechaEliminado'
 });
-
-// Actualización de varios campos a la vez (edición completa de un informe).
-// dbClimaUpdate reenvía el patch tal cual: sirve para Supabase (columnas
-// snake_case) solo si las claves coinciden, y para el JSON local (claves
-// camelCase) siempre. Como aquí mezclamos varias claves con nombre distinto
-// entre ambos (nombreSitio vs nombre_sitio, etc.), se traduce a snake_case
-// solo cuando hay Supabase configurado.
-async function dbClimaUpdateFull(id, camelPatch) {
-  if (supabase) {
-    const map = {
-      fecha: 'fecha', codInforme: 'cod_informe', nombreSitio: 'nombre_sitio',
-      codigoSitio: 'codigo_sitio', tecnico: 'tecnico', supervisor: 'supervisor',
-      numOT: 'num_ot', lpu: 'lpu', inc: 'inc', equipo: 'equipo', circuito: 'circuito',
-      tipoEquipo: 'tipo_equipo', marca: 'marca', photoCount: 'photo_count', filename: 'filename'
-    };
-    const patch = {};
-    for (const k in camelPatch) if (map[k]) patch[map[k]] = camelPatch[k];
-    return dbClimaUpdate(id, patch);
-  }
-  return dbClimaUpdate(id, camelPatch);
-}
 
 // ── Design tokens (matching original exactly) ─────────────
 const BL  = 'DEEAF6';   // azul claro — celdas etiqueta
@@ -805,6 +766,10 @@ async function buildDocx(d) {
 
     coverChildren.push(
       gap(700),
+      coverLine(`${v(d.resumen)}.`, { before: 0 }),
+      coverLine(`Equipo ${v(d.equipo)} Circuito ${v(d.circuito)} ${v(d.eqMarca)}`),
+      coverLine(`Sala ${v(d.sala)}`),
+      gap(300),
       coverLine(sitioNorm, { size: 32 }),
       gap(300),
       coverLine(`Código informe ${v(d.codInforme)}`),
@@ -1194,7 +1159,6 @@ app.post('/generar', heavyLimiter, async (req,res) => {
       filename: fname
     };
     await dbClimaInsert(entry);
-    await saveRawDataClima(entry.id, d);
 
     // Auto-envío por correo (fire-and-forget: no retrasa la descarga)
     autoEnviarInforme({
@@ -1315,107 +1279,6 @@ app.patch('/registro/:id/titulo', requireLpuEditor, async (req, res) => {
   } catch (e) { console.error('PATCH /registro/:id/titulo:', e); res.status(500).json({ error: e.message || 'Error al editar título de portada' }); }
 });
 
-// Quita el bloque de resumen/equipo/sala de la portada de un informe ya
-// generado ANTES de quitar ese bloque del generador (ver coverChildren en
-// buildDocx). Localiza el párrafo del título (único con sz=32) y borra los
-// 4 párrafos que lo preceden (resumen, "Equipo...", "Sala...", y el
-// espaciador que quedaba entre "Sala" y el título), validando su contenido
-// antes de tocar nada para no borrar algo distinto por error.
-async function patchLimpiarPortadaLegacy(buffer) {
-  const zip = await JSZip.loadAsync(buffer);
-  const docPath = 'word/document.xml';
-  const file = zip.file(docPath);
-  if (!file) throw new Error('Documento inválido: falta word/document.xml');
-  const xml = await file.async('string');
-  const paras = [...xml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)];
-  const tituloIdx = paras.findIndex(m => m[0].includes('<w:sz w:val="32"/>'));
-  if (tituloIdx < 4) throw new Error('No se encontró el título de portada en el documento, o no hay párrafos previos suficientes.');
-  const [pResumen, pEquipo, pSala, pGap] = paras.slice(tituloIdx - 4, tituloIdx);
-  const hasText = m => /<w:t[^>]*>[^<]/.test(m[0]);
-  if (!hasText(pResumen) || !pEquipo[0].includes('Equipo ') || !pSala[0].includes('Sala ') || hasText(pGap)) {
-    throw new Error('La portada de este informe no tiene el patrón esperado (resumen/equipo/sala); no se modificó nada.');
-  }
-  const start = pResumen.index;
-  const end = pGap.index + pGap[0].length;
-  const newXml = xml.slice(0, start) + xml.slice(end);
-  zip.file(docPath, newXml);
-  return zip.generateAsync({ type: 'nodebuffer' });
-}
-app.post('/registro/:id/limpiar-portada-legacy', requireLpuEditor, async (req, res) => {
-  try {
-    const entry = await dbClimaFind(req.params.id);
-    if (!entry) return res.status(404).json({ error: 'No encontrado' });
-    let buffer = await storageDownload(`clima/${entry.filename}`);
-    const fpath = path.join(DOCS_DIR, entry.filename);
-    if (!buffer) {
-      if (!fs.existsSync(fpath)) return res.status(404).json({ error: 'Archivo no existe' });
-      buffer = fs.readFileSync(fpath);
-    }
-    const patched = await patchLimpiarPortadaLegacy(buffer);
-    fs.writeFileSync(fpath, patched);
-    await storageUpload(patched, `clima/${entry.filename}`);
-    res.json({ ok: true });
-  } catch (e) { console.error('POST /registro/:id/limpiar-portada-legacy:', e); res.status(500).json({ error: e.message || 'Error al limpiar la portada' }); }
-});
-
-// Devuelve el payload completo (todos los campos + fotos) con el que se
-// generó el informe, para poder reabrirlo en el formulario y editarlo.
-// Solo existe para informes creados después de habilitar esta función.
-app.get('/registro/:id/full', requireLpuEditor, async (req, res) => {
-  try {
-    const entry = await dbClimaFind(req.params.id);
-    if (!entry) return res.status(404).json({ error: 'No encontrado' });
-    const data = await loadRawDataClima(entry.id);
-    if (!data) return res.status(404).json({ error: 'Este informe no tiene datos completos guardados (fue creado antes de habilitar la edición completa). Solo se puede editar su LPU o título de portada.' });
-    res.json(data);
-  } catch (e) { console.error('GET /registro/:id/full:', e); res.status(500).json({ error: e.message || 'Error al obtener el informe' }); }
-});
-
-// Regenera por completo el .docx de un informe ya existente a partir de un
-// payload editado (mismo formato que /generar) y actualiza el registro,
-// conservando el mismo id.
-app.put('/registro/:id/editar-completo', requireLpuEditor, async (req, res) => {
-  try {
-    const id = req.params.id;
-    const entry = await dbClimaFind(id);
-    if (!entry) return res.status(404).json({ error: 'No encontrado' });
-    const d = req.body;
-    const buffer = await buildDocx(d);
-    const fechaPart = (d.fecha || '').split(' - ')[0].trim();
-    const fnameParts = [
-      sanitizeFnamePart(d.nombreSitio) || 'Sitio',
-      initialsFnamePart(d.tecnico) || 'TEC',
-      d.equipo ? `E${sanitizeFnamePart(d.equipo, 8)}` : '',
-      d.circuito ? `C${sanitizeFnamePart(d.circuito, 8)}` : '',
-      sanitizeFnamePart(d.sala, 20),
-      sanitizeFnamePart(fechaPart, 10)
-    ].filter(Boolean);
-    const fname = `${fnameParts.join('_')}.docx`;
-
-    if (fname !== entry.filename) {
-      try { fs.unlinkSync(path.join(DOCS_DIR, entry.filename)); } catch (e) {}
-      await storageRemove([`clima/${entry.filename}`]);
-    }
-    fs.writeFileSync(path.join(DOCS_DIR, fname), buffer);
-    await storageUpload(buffer, `clima/${fname}`);
-    await saveRawDataClima(id, d);
-
-    const { photos } = d;
-    const upd = await dbClimaUpdateFull(id, {
-      fecha: d.fecha, codInforme: d.codInforme, nombreSitio: d.nombreSitio,
-      codigoSitio: d.codigoSitio, tecnico: d.tecnico,
-      supervisor: d.supervisor, numOT: d.numOT,
-      lpu: d.lpu, inc: d.ticketInc,
-      equipo: d.equipo, circuito: d.circuito,
-      tipoEquipo: d.eqTipo, marca: d.eqMarca,
-      photoCount: (photos || []).filter(Boolean).length,
-      filename: fname
-    });
-    if (upd && upd.error) return res.status(500).json({ error: upd.error });
-    res.json({ ok: true, filename: fname });
-  } catch (e) { console.error('PUT /registro/:id/editar-completo:', e); res.status(500).json({ error: e.message || 'Error al editar el informe' }); }
-});
-
 // El endpoint POST /enviar/:id se eliminó: la UI ya no ofrece envío manual y
 // aceptaba cualquier destinatario, lo que permitía usar la cuenta de correo
 // (Brevo) para spam. El auto-envío a MAIL_TO en /generar sigue vigente.
@@ -1469,12 +1332,6 @@ app.post('/papelera/restaurar/:id', async (req,res) => {
  } catch(e) { console.error('POST /papelera/restaurar:', e); res.status(500).json({ error: 'No se pudo restaurar: '+(e.message||e) }); }
 });
 
-// Borra el payload crudo (edición completa) de un informe Clima, best-effort.
-async function removeRawDataClima(id) {
-  try { fs.unlinkSync(path.join(RAW_DIR_CLIMA, `${id}.json`)); } catch (e) {}
-  await storageRemove([`clima-data/${id}.json`]);
-}
-
 // Delete permanently from papelera
 app.delete('/papelera/:id', async (req,res) => {
   const entry = await dbPapeleraFind(req.params.id);
@@ -1486,7 +1343,6 @@ app.delete('/papelera/:id', async (req,res) => {
     const fpath = path.join(PAPELERA_DIR, entry.filename);
     if (fs.existsSync(fpath)) fs.unlinkSync(fpath);
   } catch(e) {}
-  await removeRawDataClima(entry.id);
   res.json({ok:true});
 });
 
@@ -1502,7 +1358,6 @@ app.delete('/papelera', async (req,res) => {
         const f = path.join(PAPELERA_DIR, e.filename); if (fs.existsSync(f)) fs.unlinkSync(f);
       } catch(e2) {}
     });
-    await Promise.all(papelera.map(e => removeRawDataClima(e.id)));
   }
   res.json({ok:true});
 });

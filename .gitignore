@@ -2,7 +2,6 @@ node_modules/
 .env
 informes/
 papelera/
-informes_data/
 registro.json
 papelera.json
 informes_wom/

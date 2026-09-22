@@ -971,7 +971,6 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
 <script>
 const SERVER=window.location.origin;
 let serverOnline=false, allRecords=[], pendingDeleteId=null, lastInformeId=null;
-let editingId=null, editingCodInforme=null;
 
 // ══ SUPERVISORS list ══
 const SUPERVISORS=[
@@ -1615,13 +1614,7 @@ function showTab(idx){
   if(idx===6){buildSummary();checkServer();}
   if(idx===7)loadHist();
   if(idx===8)loadPapelera();
-  if(idx===0){
-    updateEstadoActual();
-    if(editingId){
-      editingId=null;editingCodInforme=null;
-      const b=document.getElementById('btnDocx');if(b)b.textContent='⬇ Descargar Informe Word (.docx)';
-    }
-  }
+  if(idx===0)updateEstadoActual();
 }
 
 // ══ PHOTOS ══
@@ -1838,7 +1831,6 @@ function buildSummary(){
 
 // ══ GENERATE ══
 async function generateDocx(){
-  if(editingId)return saveEditedInforme();
   if(!serverOnline){await checkServer();}
   if(!serverOnline){
     const st=document.getElementById('statusMsg');
@@ -1885,135 +1877,6 @@ async function generateDocx(){
   }catch(err){
     genError(err.message);
   }finally{btn.disabled=false;}
-}
-
-// Guarda los cambios de un informe ya existente (modo edición): regenera el
-// Word completo en el servidor conservando el mismo id y código de informe.
-async function saveEditedInforme(){
-  if(!serverOnline){await checkServer();}
-  if(!serverOnline){
-    const st=document.getElementById('statusMsg');
-    st.className='status err';st.innerHTML='❌ Servidor no activo.<br><strong>Ejecuta en terminal: <code>node server.js</code></strong>';
-    return;
-  }
-  const btn=document.getElementById('btnDocx');
-  btn.disabled=true;genShow();
-  const payload={
-    codInforme:editingCodInforme,fecha:buildFechaRango(),
-    nombreSitio:document.getElementById('nombreSitio').value||siteInput.value,
-    codigoSitio:g('codigoSitio'),direccion:g('direccion'),sala:g('sala'),
-    tecnico:g('tecnico'),
-    supervisor:document.getElementById('supervisor').value||supInput.value,
-    numOT:g('numOT'),lpu:g('lpu'),
-    ticketInc:g('ticketInc'),ticketTE:g('ticketTE'),ticketTI:g('ticketTI'),ticketRED:g('ticketRED'),
-    resumen:g('resumen'),observaciones:g('observaciones'),
-    eqSala:g('sala'),eqNumero:buildEquipoConCircuito(),eqTipo:g('eqTipo'),eqMarca:g('eqMarca'),eqModelo:g('eqModelo'),
-    equipo:g('eqNumero'),circuito:g('eqCircuito'),
-    m_cv:document.getElementById('m_cv').value,m_ca:document.getElementById('m_ca').value,
-    m_ev:document.getElementById('m_ev').value,m_ea:document.getElementById('m_ea').value,
-    m_condv:document.getElementById('m_condv').value,m_conda:document.getElementById('m_conda').value,
-    m_tinj:document.getElementById('m_tinj').value,m_tret:document.getElementById('m_tret').value,
-    photos:photoDataUrls.map((_,i)=>getRotatedDataUrl(i)),
-    photoDescs:photoDescs
-  };
-  try{
-    const resp=await fetch(`${SERVER}/registro/${editingId}/editar-completo`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    const d=await resp.json().catch(()=>({}));
-    if(!resp.ok)throw new Error(d.error||`Error del servidor: ${resp.status}`);
-    genSuccess(d.filename||editingCodInforme||'Informe actualizado');
-    tigToast('✔ Informe actualizado','ok');
-    editingId=null;editingCodInforme=null;
-    document.getElementById('btnDocx').textContent='⬇ Descargar Informe Word (.docx)';
-    setTimeout(()=>showTab(7),1100);
-    loadHist(true);
-  }catch(err){
-    genError(err.message);
-  }finally{btn.disabled=false;}
-}
-
-// ══ EDICIÓN COMPLETA (plmartinez) ══
-function toISODate(str){
-  if(!str)return'';
-  const[day,m,y]=str.trim().split('-');
-  if(!day||!m||!y)return'';
-  return `${y}-${m.padStart(2,'0')}-${day.padStart(2,'0')}`;
-}
-function loadPhotoDataUrlAsync(idx,dataUrl){
-  return new Promise(resolve=>{
-    createPhotoSlot(idx);
-    photoFiles[idx]=true;
-    photoDataUrls[idx]=dataUrl;
-    const im=document.getElementById(`img${idx}`);
-    im.onload=()=>{
-      const sl=document.getElementById(`slot${idx}`);
-      sl.classList.add('filled');
-      const refW=sl.clientWidth||200, refH=sl.clientHeight||150;
-      photoTransforms[idx]={x:0,y:0,scale:1,rot:0,refW,refH};
-      im.style.transform='';
-      document.getElementById('photoTabNum').textContent=photoFiles.filter(Boolean).length;
-      resolve();
-    };
-    im.src=dataUrl;
-  });
-}
-async function populatePhotosFromData(photos,descs){
-  buildPhotoSlots();
-  for(let i=0;i<12;i++){photoFiles[i]=null;photoDataUrls[i]=null;photoDescs[i]='';photoTransforms[i]={x:0,y:0,scale:1,rot:0};}
-  const list=photos||[];
-  for(let i=0;i<list.length&&i<12;i++){
-    if(!list[i])continue;
-    await loadPhotoDataUrlAsync(i,list[i]);
-    photoDescs[i]=(descs&&descs[i])||'';
-    const d=document.getElementById(`desc${i}`);
-    if(d){d.value=photoDescs[i];d.style.display='block';}
-  }
-  ensureTrailingSlot();
-  updateEstadoActual();
-}
-async function populateFormFromData(d){
-  const[fIni,fTerm]=(d.fecha||'').split(' - ').map(s=>s.trim());
-  document.getElementById('fechaEjecucion').value=toISODate(fIni);
-  document.getElementById('fechaTermino').value=toISODate(fTerm||fIni);
-  selectSite(d.nombreSitio||'',d.direccion||'');
-  document.getElementById('codigoSitio').value=d.codigoSitio||'';
-  document.getElementById('sala').value=d.sala||d.eqSala||'';
-  selectTec(d.tecnico||'');
-  selectSup(d.supervisor||'');
-  document.getElementById('numOT').value=d.numOT||'';
-  document.getElementById('lpu').value=d.lpu||'';
-  document.getElementById('ticketInc').value=d.ticketInc||'';
-  document.getElementById('ticketTE').value=d.ticketTE||'';
-  document.getElementById('ticketTI').value=d.ticketTI||'';
-  document.getElementById('ticketRED').value=d.ticketRED||'';
-  document.getElementById('eqCircuito').value=d.circuito||'';
-  document.getElementById('eqNumero').value=d.equipo||'';
-  document.getElementById('eqTipo').value=d.eqTipo||'';
-  document.getElementById('eqMarca').value=d.eqMarca||'';
-  document.getElementById('eqModelo').value=d.eqModelo||'';
-  document.getElementById('m_cv').value=d.m_cv||'';
-  document.getElementById('m_ca').value=d.m_ca||'';
-  document.getElementById('m_ev').value=d.m_ev||'';
-  document.getElementById('m_ea').value=d.m_ea||'';
-  document.getElementById('m_condv').value=d.m_condv||'';
-  document.getElementById('m_conda').value=d.m_conda||'';
-  document.getElementById('m_tinj').value=d.m_tinj||'';
-  document.getElementById('m_tret').value=d.m_tret||'';
-  document.getElementById('resumen').value=d.resumen||'';
-  document.getElementById('observaciones').value=d.observaciones||'';
-  await populatePhotosFromData(d.photos,d.photoDescs);
-}
-async function editInformeCompleto(id){
-  try{
-    const resp=await fetch(`${SERVER}/registro/${id}/full`,{cache:'no-store'});
-    const d=await resp.json().catch(()=>({}));
-    if(!resp.ok)throw new Error(d.error||'No se pudo cargar el informe');
-    editingId=id;editingCodInforme=d.codInforme||'';
-    await populateFormFromData(d);
-    unlockedUpTo=6;updateTabStates();
-    const b=document.getElementById('btnDocx');if(b)b.textContent='💾 Guardar cambios';
-    showTab(1);
-    tigToast('✏️ Editando informe — modifica lo necesario y guarda al final','ok');
-  }catch(e){tigToast('❌ '+e.message,'err');}
 }
 
 function verInformePdf(){
@@ -2300,8 +2163,7 @@ function renderHist(records){
           <button class="act-btn act-ver" onclick="verInformePdfRecord('${r.id}')">👁 Ver Informe</button>
           <button class="act-btn act-dl" onclick="downloadRecord('${r.id}')">⬇ Descargar</button>
           ${canEditLpu?`<button class="act-btn act-ver" onclick="editLpu('${r.id}')">✏️ Editar LPU</button>`:''}
-          ${canEditLpu&&TITULO_EDITABLE_SITIOS.has(norm(r.nombreSitio||'').toUpperCase())?`<button class="act-btn act-ver" onclick="editTitulo('${r.id}')">✏️ Editar título portada</button><button class="act-btn act-ver" onclick="limpiarPortadaLegacy('${r.id}')">🧹 Quitar resumen de portada</button>`:''}
-          ${canEditLpu?`<button class="act-btn act-ver" onclick="editInformeCompleto('${r.id}')">📝 Editar informe</button>`:''}
+          ${canEditLpu&&TITULO_EDITABLE_SITIOS.has(norm(r.nombreSitio||'').toUpperCase())?`<button class="act-btn act-ver" onclick="editTitulo('${r.id}')">✏️ Editar título portada</button>`:''}
           <button class="act-btn act-del" onclick="openConfirm('${r.id}')">🗑️ Borrar</button>
         </div>
       </div>
@@ -2364,18 +2226,6 @@ async function saveTitulo(){
 }
 document.getElementById('tituloModal').addEventListener('click',function(e){if(e.target===this)closeTituloModal();});
 document.getElementById('tituloInput').addEventListener('keydown',function(e){if(e.key==='Enter')saveTitulo();});
-
-// Quita, de un informe ya generado con el layout viejo, el bloque de
-// resumen/equipo/sala que sobraba en la portada (ver limpiar-portada-legacy).
-async function limpiarPortadaLegacy(id){
-  if(!confirm('Se quitará el bloque de resumen/equipo/sala de la portada de este informe. Esta acción no se puede deshacer. ¿Continuar?'))return;
-  try{
-    const resp=await fetch(`${SERVER}/registro/${id}/limpiar-portada-legacy`,{method:'POST'});
-    const d=await resp.json().catch(()=>({}));
-    if(!resp.ok)throw new Error(d.error||'Error al limpiar la portada');
-    tigToast('✔ Portada actualizada','ok');
-  }catch(e){tigToast('❌ '+e.message,'err');}
-}
 function verInformePdfRecord(id){window.open(`${SERVER}/ver-informe.html?tipo=clima&id=${id}`,'_blank');}
 function openConfirm(id){pendingDeleteId=id;const sitio=(allRecords.find(x=>x.id===id)||{}).nombreSitio||'';document.getElementById('confirmMsg').textContent=`Se eliminará el informe de "${sitio}". Esta acción no se puede deshacer.`;document.getElementById('confirmDel').classList.add('open');}
 function closeConfirm(){document.getElementById('confirmDel').classList.remove('open');pendingDeleteId=null;}
