@@ -1279,6 +1279,43 @@ app.patch('/registro/:id/titulo', requireLpuEditor, async (req, res) => {
   } catch (e) { console.error('PATCH /registro/:id/titulo:', e); res.status(500).json({ error: e.message || 'Error al editar título de portada' }); }
 });
 
+// Sube un informe .docx ya confeccionado con esta misma aplicación y lo
+// agrega al historial con los metadatos indicados a mano. No regenera ni
+// valida el contenido del Word: solo lo guarda tal cual llega.
+app.post('/registro/subir', requireLpuEditor, async (req, res) => {
+  try {
+    const d = req.body || {};
+    if (!d.fileBase64) return res.status(400).json({ error: 'Falta el archivo .docx' });
+    if (!/\.docx$/i.test(d.fileName || '')) return res.status(400).json({ error: 'El archivo debe ser un .docx' });
+    const buffer = Buffer.from(d.fileBase64, 'base64');
+    if (buffer.length > 20 * 1024 * 1024) return res.status(413).json({ error: 'El archivo supera el máximo de 20 MB.' });
+    if (buffer.slice(0, 2).toString('ascii') !== 'PK') return res.status(400).json({ error: 'El archivo no es un .docx válido.' });
+
+    const base = sanitizeFnamePart(d.fileName.replace(/\.docx$/i, ''), 80) || `Informe-${Date.now()}`;
+    let fname = `${base}.docx`;
+    if (fs.existsSync(path.join(DOCS_DIR, fname))) fname = `${base}-${Date.now()}.docx`;
+
+    fs.writeFileSync(path.join(DOCS_DIR, fname), buffer);
+    await storageUpload(buffer, `clima/${fname}`);
+
+    const entry = {
+      id: Date.now().toString(),
+      fecha: d.fecha, fechaCreacion: new Date().toISOString(),
+      codInforme: d.codInforme, nombreSitio: d.nombreSitio,
+      codigoSitio: d.codigoSitio, tecnico: d.tecnico,
+      supervisor: d.supervisor, numOT: d.numOT,
+      lpu: d.lpu, inc: d.inc,
+      equipo: d.equipo, circuito: d.circuito,
+      tipoEquipo: d.tipoEquipo, marca: d.marca,
+      photoCount: 0,
+      filename: fname
+    };
+    const ins = await dbClimaInsert(entry);
+    if (ins && ins.error) return res.status(500).json({ error: ins.error });
+    res.json({ ok: true, id: entry.id });
+  } catch (e) { console.error('POST /registro/subir:', e); res.status(500).json({ error: e.message || 'Error al subir el informe' }); }
+});
+
 // El endpoint POST /enviar/:id se eliminó: la UI ya no ofrece envío manual y
 // aceptaba cualquier destinatario, lo que permitía usar la cuenta de correo
 // (Brevo) para spam. El auto-envío a MAIL_TO en /generar sigue vigente.

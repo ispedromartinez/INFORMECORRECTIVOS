@@ -792,6 +792,7 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
     <button id="btnRefreshHist" class="btn-refresh" onclick="refreshHist()">↻</button>
     <button class="btn-refresh" onclick="openEquipoModal()">🔧 Equipo</button>
     <button class="btn-refresh" onclick="openReporteModal()">📊 Reporte</button>
+    <button class="btn-refresh" id="btnUpload" style="display:none" onclick="openUploadModal()">⬆ Subir informe</button>
   </div>
   <div class="hist-stats" id="histStats">
     <div class="stat-box"><div class="stat-num" id="sTotal">0</div><div class="stat-lbl">Total</div></div>
@@ -947,6 +948,32 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
     <div class="confirm-btns">
       <button class="cbtn cancel" onclick="closeTituloModal()">Cancelar</button>
       <button class="cbtn confirm lpu" id="tituloSaveBtn" onclick="saveTitulo()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="uploadModal">
+  <div class="confirm-box" style="max-width:480px;max-height:88vh;overflow-y:auto;text-align:left">
+    <div class="confirm-icon" style="text-align:center">⬆</div>
+    <div class="confirm-title" style="text-align:center">Subir informe ya confeccionado</div>
+    <div class="confirm-msg" style="text-align:center">Solo para informes .docx hechos con esta misma aplicación. Completa los datos para que aparezca correctamente en el historial.</div>
+    <div class="field"><label>Archivo (.docx)</label><input type="file" id="up_file" accept=".docx" onchange="onUploadFileChange(this.files[0])"></div>
+    <div class="field"><label>Código de Informe</label><input type="text" id="up_codInforme" placeholder="Igual al del documento"></div>
+    <div class="field"><label>Nombre de Sitio</label><input type="text" id="up_nombreSitio"></div>
+    <div class="field"><label>Código de Sitio</label><input type="text" id="up_codigoSitio"></div>
+    <div class="field"><label>Fecha</label><input type="text" id="up_fecha" placeholder="dd-mm-yyyy"></div>
+    <div class="field"><label>Técnico</label><input type="text" id="up_tecnico"></div>
+    <div class="field"><label>Supervisor</label><input type="text" id="up_supervisor"></div>
+    <div class="field"><label>Número de OT</label><input type="text" id="up_numOT"></div>
+    <div class="field"><label>LPU</label><input type="text" id="up_lpu"></div>
+    <div class="field"><label>Inc.</label><input type="text" id="up_inc"></div>
+    <div class="field"><label>Equipo</label><input type="text" id="up_equipo"></div>
+    <div class="field"><label>Circuito</label><input type="text" id="up_circuito"></div>
+    <div class="field"><label>Tipo de Equipo</label><input type="text" id="up_tipoEquipo"></div>
+    <div class="field"><label>Marca</label><input type="text" id="up_marca"></div>
+    <div class="confirm-btns">
+      <button class="cbtn cancel" onclick="closeUploadModal()">Cancelar</button>
+      <button class="cbtn confirm lpu" id="uploadSaveBtn" onclick="submitUpload()">Subir</button>
     </div>
   </div>
 </div>
@@ -2226,6 +2253,83 @@ async function saveTitulo(){
 }
 document.getElementById('tituloModal').addEventListener('click',function(e){if(e.target===this)closeTituloModal();});
 document.getElementById('tituloInput').addEventListener('keydown',function(e){if(e.key==='Enter')saveTitulo();});
+
+// ══ SUBIR INFORME YA CONFECCIONADO (plmartinez) ══
+// Best-effort: el nombre del .docx que genera esta app sigue el patrón
+// Sitio_TecIniciales_E{equipo}_C{circuito}_Sala_dd-mm-aaaa.docx (E/C son
+// opcionales). Se usa solo para precargar el formulario; todo es editable.
+function parseUploadFilename(name){
+  const base=(name||'').replace(/\.docx$/i,'');
+  const tokens=base.split('_').filter(Boolean);
+  const out={fecha:'',equipo:'',circuito:'',nombreSitio:''};
+  if(!tokens.length)return out;
+  out.nombreSitio=tokens[0].replace(/-/g,' ');
+  const last=tokens[tokens.length-1];
+  if(/^\d{1,2}-\d{1,2}-\d{4}$/.test(last)){out.fecha=last;tokens.pop();}
+  for(let i=tokens.length-1;i>=2;i--){
+    const t=tokens[i];
+    if(/^E[0-9A-Za-z-]+$/.test(t)&&!out.equipo){out.equipo=t.slice(1).replace(/-/g,' ');continue;}
+    if(/^C[0-9A-Za-z-]+$/.test(t)&&!out.circuito){out.circuito=t.slice(1).replace(/-/g,' ');}
+  }
+  return out;
+}
+function onUploadFileChange(file){
+  if(!file)return;
+  const p=parseUploadFilename(file.name);
+  if(p.nombreSitio&&!document.getElementById('up_nombreSitio').value)document.getElementById('up_nombreSitio').value=p.nombreSitio;
+  if(p.fecha&&!document.getElementById('up_fecha').value)document.getElementById('up_fecha').value=p.fecha;
+  if(p.equipo&&!document.getElementById('up_equipo').value)document.getElementById('up_equipo').value=p.equipo;
+  if(p.circuito&&!document.getElementById('up_circuito').value)document.getElementById('up_circuito').value=p.circuito;
+}
+function openUploadModal(){
+  ['up_codInforme','up_nombreSitio','up_codigoSitio','up_fecha','up_tecnico','up_supervisor','up_numOT','up_lpu','up_inc','up_equipo','up_circuito','up_tipoEquipo','up_marca'].forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('up_file').value='';
+  document.getElementById('uploadModal').classList.add('open');
+}
+function closeUploadModal(){document.getElementById('uploadModal').classList.remove('open');}
+document.getElementById('uploadModal').addEventListener('click',function(e){if(e.target===this)closeUploadModal();});
+function readFileAsBase64(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result.split(',')[1]||'');
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+async function submitUpload(){
+  const file=document.getElementById('up_file').files[0];
+  if(!file){tigToast('❌ Selecciona un archivo .docx','err');return;}
+  if(!/\.docx$/i.test(file.name)){tigToast('❌ El archivo debe ser .docx','err');return;}
+  const payload={
+    fileName:file.name,
+    codInforme:document.getElementById('up_codInforme').value.trim(),
+    nombreSitio:document.getElementById('up_nombreSitio').value.trim(),
+    codigoSitio:document.getElementById('up_codigoSitio').value.trim(),
+    fecha:document.getElementById('up_fecha').value.trim(),
+    tecnico:document.getElementById('up_tecnico').value.trim(),
+    supervisor:document.getElementById('up_supervisor').value.trim(),
+    numOT:document.getElementById('up_numOT').value.trim(),
+    lpu:document.getElementById('up_lpu').value.trim(),
+    inc:document.getElementById('up_inc').value.trim(),
+    equipo:document.getElementById('up_equipo').value.trim(),
+    circuito:document.getElementById('up_circuito').value.trim(),
+    tipoEquipo:document.getElementById('up_tipoEquipo').value.trim(),
+    marca:document.getElementById('up_marca').value.trim()
+  };
+  if(!payload.codInforme||!payload.nombreSitio){tigToast('❌ Completa al menos Código de Informe y Nombre de Sitio','err');return;}
+  const btn=document.getElementById('uploadSaveBtn');
+  btn.disabled=true;btn.textContent='Subiendo...';
+  try{
+    payload.fileBase64=await readFileAsBase64(file);
+    const resp=await fetch(`${SERVER}/registro/subir`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const d=await resp.json().catch(()=>({}));
+    if(!resp.ok)throw new Error(d.error||'Error al subir el informe');
+    closeUploadModal();
+    tigToast('✔ Informe agregado al historial','ok');
+    loadHist(true);
+  }catch(e){tigToast('❌ '+e.message,'err');}
+  finally{btn.disabled=false;btn.textContent='Subir';}
+}
 function verInformePdfRecord(id){window.open(`${SERVER}/ver-informe.html?tipo=clima&id=${id}`,'_blank');}
 function openConfirm(id){pendingDeleteId=id;const sitio=(allRecords.find(x=>x.id===id)||{}).nombreSitio||'';document.getElementById('confirmMsg').textContent=`Se eliminará el informe de "${sitio}". Esta acción no se puede deshacer.`;document.getElementById('confirmDel').classList.add('open');}
 function closeConfirm(){document.getElementById('confirmDel').classList.remove('open');pendingDeleteId=null;}
@@ -2393,7 +2497,14 @@ function showLogin(){_gate.style.display='flex';}
 function hideLogin(){_gate.style.display='none';}
 let canEditLpu=false;
 async function checkAuth(){
-  try{const r=await fetch(SERVER+'/sesion',{cache:'no-store'});const d=await r.json();if(d.auth){canEditLpu=!!d.canEditLpu;hideLogin();return true;}}catch{}
+  try{
+    const r=await fetch(SERVER+'/sesion',{cache:'no-store'});const d=await r.json();
+    if(d.auth){
+      canEditLpu=!!d.canEditLpu;hideLogin();
+      const bu=document.getElementById('btnUpload');if(bu)bu.style.display=canEditLpu?'':'none';
+      return true;
+    }
+  }catch{}
   showLogin();return false;
 }
 async function doLogout(){try{await fetch(SERVER+'/logout',{method:'POST'});}catch{}location.reload();}
