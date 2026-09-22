@@ -1315,6 +1315,49 @@ app.patch('/registro/:id/titulo', requireLpuEditor, async (req, res) => {
   } catch (e) { console.error('PATCH /registro/:id/titulo:', e); res.status(500).json({ error: e.message || 'Error al editar título de portada' }); }
 });
 
+// Quita el bloque de resumen/equipo/sala de la portada de un informe ya
+// generado ANTES de quitar ese bloque del generador (ver coverChildren en
+// buildDocx). Localiza el párrafo del título (único con sz=32) y borra los
+// 4 párrafos que lo preceden (resumen, "Equipo...", "Sala...", y el
+// espaciador que quedaba entre "Sala" y el título), validando su contenido
+// antes de tocar nada para no borrar algo distinto por error.
+async function patchLimpiarPortadaLegacy(buffer) {
+  const zip = await JSZip.loadAsync(buffer);
+  const docPath = 'word/document.xml';
+  const file = zip.file(docPath);
+  if (!file) throw new Error('Documento inválido: falta word/document.xml');
+  const xml = await file.async('string');
+  const paras = [...xml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)];
+  const tituloIdx = paras.findIndex(m => m[0].includes('<w:sz w:val="32"/>'));
+  if (tituloIdx < 4) throw new Error('No se encontró el título de portada en el documento, o no hay párrafos previos suficientes.');
+  const [pResumen, pEquipo, pSala, pGap] = paras.slice(tituloIdx - 4, tituloIdx);
+  const hasText = m => /<w:t[^>]*>[^<]/.test(m[0]);
+  if (!hasText(pResumen) || !pEquipo[0].includes('Equipo ') || !pSala[0].includes('Sala ') || hasText(pGap)) {
+    throw new Error('La portada de este informe no tiene el patrón esperado (resumen/equipo/sala); no se modificó nada.');
+  }
+  const start = pResumen.index;
+  const end = pGap.index + pGap[0].length;
+  const newXml = xml.slice(0, start) + xml.slice(end);
+  zip.file(docPath, newXml);
+  return zip.generateAsync({ type: 'nodebuffer' });
+}
+app.post('/registro/:id/limpiar-portada-legacy', requireLpuEditor, async (req, res) => {
+  try {
+    const entry = await dbClimaFind(req.params.id);
+    if (!entry) return res.status(404).json({ error: 'No encontrado' });
+    let buffer = await storageDownload(`clima/${entry.filename}`);
+    const fpath = path.join(DOCS_DIR, entry.filename);
+    if (!buffer) {
+      if (!fs.existsSync(fpath)) return res.status(404).json({ error: 'Archivo no existe' });
+      buffer = fs.readFileSync(fpath);
+    }
+    const patched = await patchLimpiarPortadaLegacy(buffer);
+    fs.writeFileSync(fpath, patched);
+    await storageUpload(patched, `clima/${entry.filename}`);
+    res.json({ ok: true });
+  } catch (e) { console.error('POST /registro/:id/limpiar-portada-legacy:', e); res.status(500).json({ error: e.message || 'Error al limpiar la portada' }); }
+});
+
 // Devuelve el payload completo (todos los campos + fotos) con el que se
 // generó el informe, para poder reabrirlo en el formulario y editarlo.
 // Solo existe para informes creados después de habilitar esta función.

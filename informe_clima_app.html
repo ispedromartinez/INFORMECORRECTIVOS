@@ -2300,7 +2300,7 @@ function renderHist(records){
           <button class="act-btn act-ver" onclick="verInformePdfRecord('${r.id}')">👁 Ver Informe</button>
           <button class="act-btn act-dl" onclick="downloadRecord('${r.id}')">⬇ Descargar</button>
           ${canEditLpu?`<button class="act-btn act-ver" onclick="editLpu('${r.id}')">✏️ Editar LPU</button>`:''}
-          ${canEditLpu&&TITULO_EDITABLE_SITIOS.has(norm(r.nombreSitio||'').toUpperCase())?`<button class="act-btn act-ver" onclick="editTitulo('${r.id}')">✏️ Editar título portada</button>`:''}
+          ${canEditLpu&&TITULO_EDITABLE_SITIOS.has(norm(r.nombreSitio||'').toUpperCase())?`<button class="act-btn act-ver" onclick="editTitulo('${r.id}')">✏️ Editar título portada</button><button class="act-btn act-ver" onclick="limpiarPortadaLegacy('${r.id}')">🧹 Quitar resumen de portada</button>`:''}
           ${canEditLpu?`<button class="act-btn act-ver" onclick="editInformeCompleto('${r.id}')">📝 Editar informe</button>`:''}
           <button class="act-btn act-del" onclick="openConfirm('${r.id}')">🗑️ Borrar</button>
         </div>
@@ -2364,6 +2364,18 @@ async function saveTitulo(){
 }
 document.getElementById('tituloModal').addEventListener('click',function(e){if(e.target===this)closeTituloModal();});
 document.getElementById('tituloInput').addEventListener('keydown',function(e){if(e.key==='Enter')saveTitulo();});
+
+// Quita, de un informe ya generado con el layout viejo, el bloque de
+// resumen/equipo/sala que sobraba en la portada (ver limpiar-portada-legacy).
+async function limpiarPortadaLegacy(id){
+  if(!confirm('Se quitará el bloque de resumen/equipo/sala de la portada de este informe. Esta acción no se puede deshacer. ¿Continuar?'))return;
+  try{
+    const resp=await fetch(`${SERVER}/registro/${id}/limpiar-portada-legacy`,{method:'POST'});
+    const d=await resp.json().catch(()=>({}));
+    if(!resp.ok)throw new Error(d.error||'Error al limpiar la portada');
+    tigToast('✔ Portada actualizada','ok');
+  }catch(e){tigToast('❌ '+e.message,'err');}
+}
 function verInformePdfRecord(id){window.open(`${SERVER}/ver-informe.html?tipo=clima&id=${id}`,'_blank');}
 function openConfirm(id){pendingDeleteId=id;const sitio=(allRecords.find(x=>x.id===id)||{}).nombreSitio||'';document.getElementById('confirmMsg').textContent=`Se eliminará el informe de "${sitio}". Esta acción no se puede deshacer.`;document.getElementById('confirmDel').classList.add('open');}
 function closeConfirm(){document.getElementById('confirmDel').classList.remove('open');pendingDeleteId=null;}
