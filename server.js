@@ -766,11 +766,9 @@ async function buildDocx(d) {
 
     coverChildren.push(
       gap(700),
-      coverLine(`${v(d.resumen)}.`, { before: 0 }),
-      coverLine(`Equipo ${v(d.equipo)} Circuito ${v(d.circuito)} ${v(d.eqMarca)}`),
-      coverLine(`Sala ${v(d.sala)}`),
-      gap(300),
       coverLine(sitioNorm, { size: 32 }),
+      gap(300),
+      coverLine(v(d.tituloPortada)),
       gap(300),
       coverLine(`Código informe ${v(d.codInforme)}`),
       coverLine(v(d.fecha)),

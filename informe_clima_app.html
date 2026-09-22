@@ -739,6 +739,10 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
 
 <!-- ══ TAB 4: NOTAS ══ -->
 <div class="section" id="tab4">
+  <div class="card" id="cardTituloPortada" style="display:none">
+    <div class="card-title">Título de Portada<span class="req"> *</span></div>
+    <div class="field"><input type="text" id="tituloPortada" placeholder="Ej: BÚSQUEDA Y REPARACIÓN DE FUGA EN EQUIPO 1 CIRCUITO 1"></div>
+  </div>
   <div class="card">
     <div class="card-title">Resumen de Actividad<span class="req"> *</span></div>
     <textarea id="resumen" rows="4" placeholder="Describir las actividades realizadas..." spellcheck="true" lang="es"></textarea>
@@ -1513,7 +1517,13 @@ async function buildCodigoFinal(){
     return `${base}${max}`;
   }catch{return base;}
 }
+const SITIOS_CON_PORTADA=new Set(['DATA CENTER SAN MARTIN','DATA CENTER APOQUINDO']);
+function toggleTituloPortada(){
+  const show=SITIOS_CON_PORTADA.has((document.getElementById('nombreSitio').value||'').trim().toUpperCase());
+  document.getElementById('cardTituloPortada').style.display=show?'':'none';
+}
 function previewCod(){
+  toggleTituloPortada();
   const base=buildCodigo();
   const el=document.getElementById('codPreview');
   if(base){
@@ -1528,7 +1538,7 @@ function previewCod(){
 function nuevoInforme(){
   // Clear all fields
   const ids=['codigoSitio','fechaEjecucion','fechaTermino','sala','tecnico','numOT','lpu',
-    'ticketInc','ticketTE','ticketTI','ticketRED','resumen','observaciones',
+    'ticketInc','ticketTE','ticketTI','ticketRED','resumen','observaciones','tituloPortada',
     'eqCircuito','eqNumero','eqTipo','eqMarca','eqModelo',
     'm_cv','m_ca','m_ev','m_ea','m_condv','m_conda','m_tinj','m_tret'];
   ids.forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -1592,6 +1602,7 @@ const REQUIRED={
   ],
   4:[
     {elId:'resumen', check:()=>document.getElementById('resumen').value.trim()},
+    {elId:'tituloPortada', check:()=>!SITIOS_CON_PORTADA.has((document.getElementById('nombreSitio').value||'').trim().toUpperCase())||document.getElementById('tituloPortada').value.trim()},
   ]
 };
 function validateTab(tabIdx){
@@ -1866,7 +1877,7 @@ async function generateDocx(){
     supervisor:document.getElementById('supervisor').value||supInput.value,
     numOT:g('numOT'),lpu:g('lpu'),
     ticketInc:g('ticketInc'),ticketTE:g('ticketTE'),ticketTI:g('ticketTI'),ticketRED:g('ticketRED'),
-    resumen:g('resumen'),observaciones:g('observaciones'),
+    resumen:g('resumen'),observaciones:g('observaciones'),tituloPortada:g('tituloPortada'),
     eqSala:g('sala'),eqNumero:buildEquipoConCircuito(),eqTipo:g('eqTipo'),eqMarca:g('eqMarca'),eqModelo:g('eqModelo'),
     equipo:g('eqNumero'),circuito:g('eqCircuito'),
     m_cv:document.getElementById('m_cv').value,m_ca:document.getElementById('m_ca').value,
