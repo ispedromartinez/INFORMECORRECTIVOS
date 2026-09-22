@@ -1279,9 +1279,61 @@ app.patch('/registro/:id/titulo', requireLpuEditor, async (req, res) => {
   } catch (e) { console.error('PATCH /registro/:id/titulo:', e); res.status(500).json({ error: e.message || 'Error al editar título de portada' }); }
 });
 
+// Lee todos los <w:t>texto</w:t> de un XML de Word, en orden de aparición.
+function flatWordTexts(xml) {
+  return [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]);
+}
+// Extrae del propio .docx (generado por /generar con el layout fijo de
+// buildDocx) los campos que necesita el registro, buscando las etiquetas
+// fijas de la tabla ("Nombre de Sitio", "LPU", etc.) y tomando el/los
+// textos que le siguen. Como se busca por texto de etiqueta (no por
+// posición absoluta), no importa si el informe tiene portada (Data Center
+// San Martín/Apoquindo) antepuesta al cuerpo.
+async function extractClimaFieldsFromDocx(buffer) {
+  const zip = await JSZip.loadAsync(buffer);
+  const docFile = zip.file('word/document.xml');
+  if (!docFile) throw new Error('El archivo no tiene word/document.xml (¿es realmente un .docx de Word?).');
+  const docTexts = flatWordTexts(await docFile.async('string'));
+  const headerFile = zip.file('word/header1.xml');
+  const headerTexts = headerFile ? flatWordTexts(await headerFile.async('string')) : [];
+
+  const clean = t => (t === undefined || t === 'N/A') ? '' : t;
+  const after = (arr, label) => { const i = arr.indexOf(label); return i >= 0 ? clean(arr[i + 1]) : ''; };
+
+  const out = {
+    codInforme: after(headerTexts, 'COD.'),
+    nombreSitio: after(docTexts, 'Nombre de Sitio'),
+    codigoSitio: after(docTexts, 'Código de Sitio'),
+    lpu: after(docTexts, 'LPU'),
+    fecha: after(docTexts, 'Fecha Ejecución'),
+    tecnico: after(docTexts, 'Técnico Ejecutante'),
+    supervisor: after(docTexts, 'Supervisor'),
+    inc: '', numOT: '', equipo: '', circuito: '', tipoEquipo: '', marca: ''
+  };
+
+  const idxTk = docTexts.indexOf('Números de Tickets');
+  if (idxTk >= 0) {
+    out.inc = clean(docTexts[idxTk + 6]);
+    out.numOT = clean(docTexts[idxTk + 10]);
+  }
+  const idxEq = docTexts.indexOf('DATOS GENERALES DEL EQUIPAMIENTO');
+  if (idxEq >= 0) {
+    const eqCombinado = clean(docTexts[idxEq + 7]);
+    out.tipoEquipo = clean(docTexts[idxEq + 8]);
+    out.marca = clean(docTexts[idxEq + 9]);
+    const m = eqCombinado.match(/^E(\S*)(?:\s+C(\S*))?$/i);
+    if (m) { out.equipo = m[1] || ''; out.circuito = m[2] || ''; }
+  }
+  if (!out.codInforme && !out.nombreSitio) {
+    throw new Error('No se pudo leer el informe: no tiene el formato de esta aplicación (¿es un .docx de otro origen?).');
+  }
+  return out;
+}
+
 // Sube un informe .docx ya confeccionado con esta misma aplicación y lo
-// agrega al historial con los metadatos indicados a mano. No regenera ni
-// valida el contenido del Word: solo lo guarda tal cual llega.
+// agrega al historial. Todos los metadatos se leen del propio documento
+// (ver extractClimaFieldsFromDocx); no regenera ni modifica su contenido,
+// solo lo guarda tal cual llega.
 app.post('/registro/subir', requireLpuEditor, async (req, res) => {
   try {
     const d = req.body || {};
@@ -1290,6 +1342,8 @@ app.post('/registro/subir', requireLpuEditor, async (req, res) => {
     const buffer = Buffer.from(d.fileBase64, 'base64');
     if (buffer.length > 20 * 1024 * 1024) return res.status(413).json({ error: 'El archivo supera el máximo de 20 MB.' });
     if (buffer.slice(0, 2).toString('ascii') !== 'PK') return res.status(400).json({ error: 'El archivo no es un .docx válido.' });
+
+    const fields = await extractClimaFieldsFromDocx(buffer);
 
     const base = sanitizeFnamePart(d.fileName.replace(/\.docx$/i, ''), 80) || `Informe-${Date.now()}`;
     let fname = `${base}.docx`;
@@ -1300,19 +1354,19 @@ app.post('/registro/subir', requireLpuEditor, async (req, res) => {
 
     const entry = {
       id: Date.now().toString(),
-      fecha: d.fecha, fechaCreacion: new Date().toISOString(),
-      codInforme: d.codInforme, nombreSitio: d.nombreSitio,
-      codigoSitio: d.codigoSitio, tecnico: d.tecnico,
-      supervisor: d.supervisor, numOT: d.numOT,
-      lpu: d.lpu, inc: d.inc,
-      equipo: d.equipo, circuito: d.circuito,
-      tipoEquipo: d.tipoEquipo, marca: d.marca,
+      fecha: fields.fecha, fechaCreacion: new Date().toISOString(),
+      codInforme: fields.codInforme, nombreSitio: fields.nombreSitio,
+      codigoSitio: fields.codigoSitio, tecnico: fields.tecnico,
+      supervisor: fields.supervisor, numOT: fields.numOT,
+      lpu: fields.lpu, inc: fields.inc,
+      equipo: fields.equipo, circuito: fields.circuito,
+      tipoEquipo: fields.tipoEquipo, marca: fields.marca,
       photoCount: 0,
       filename: fname
     };
     const ins = await dbClimaInsert(entry);
     if (ins && ins.error) return res.status(500).json({ error: ins.error });
-    res.json({ ok: true, id: entry.id });
+    res.json({ ok: true, id: entry.id, campos: fields });
   } catch (e) { console.error('POST /registro/subir:', e); res.status(500).json({ error: e.message || 'Error al subir el informe' }); }
 });
 
