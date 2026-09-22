@@ -1232,6 +1232,7 @@ async function datosParaEditar(entry) {
     buffer = fs.readFileSync(fpath);
   }
   const extraidos = await extractClimaFieldsFromDocx(buffer);
+  const photos = await extractPhotosFromDocx(buffer).catch(() => []);
   return {
     datos: {
       ...extraidos,
@@ -1239,7 +1240,7 @@ async function datosParaEditar(entry) {
       sala: extraidos.eqSala || entry.sala || '',
       tituloPortada: '',
       ticketTE: '', ticketTI: '', ticketRED: '',
-      photos: [], photoDescs: []
+      photos, photoDescs: []
     },
     parcial: true
   };
@@ -1362,6 +1363,44 @@ async function countPhotosInDocx(buffer) {
   if (idx < 0) return 0;
   const blips = xml.slice(idx).match(/<a:blip r:embed="rId\d+"/g);
   return blips ? blips.length : 0;
+}
+
+// Extrae las fotos reales embebidas en la tabla "REGISTRO FOTOGRAFICO" de un
+// .docx (subido con "Subir informe" o generado en una versión vieja sin JSON
+// completo guardado), como data URIs listas para volver a usar en
+// buildDocx. Sin esto, abrir un informe viejo en modo edición y guardar
+// borraba las fotos: el formulario partía con photos:[] y PUT /registro/:id
+// regenera el .docx entero desde ese arreglo, sobrescribiendo el original.
+async function extractPhotosFromDocx(buffer) {
+  const zip = await JSZip.loadAsync(buffer);
+  const docFile = zip.file('word/document.xml');
+  const relsFile = zip.file('word/_rels/document.xml.rels');
+  if (!docFile || !relsFile) return [];
+  const xml = await docFile.async('string');
+  const idx = xml.indexOf('REGISTRO FOTOGRAFICO');
+  if (idx < 0) return [];
+  const rIds = [...xml.slice(idx).matchAll(/<a:blip r:embed="(rId\d+)"/g)].map(m => m[1]);
+  if (!rIds.length) return [];
+
+  const relsXml = await relsFile.async('string');
+  const targets = {};
+  for (const m of relsXml.matchAll(/<Relationship[^>]*Id="(rId\d+)"[^>]*Target="([^"]+)"/g)) {
+    targets[m[1]] = m[2];
+  }
+
+  const photos = [];
+  for (const rId of rIds) {
+    const target = targets[rId];
+    if (!target) { photos.push(null); continue; }
+    const mediaPath = 'word/' + target.replace(/^\/?word\//, '');
+    const mediaFile = zip.file(mediaPath);
+    if (!mediaFile) { photos.push(null); continue; }
+    const base64 = await mediaFile.async('base64');
+    const ext = (mediaPath.split('.').pop() || 'jpeg').toLowerCase();
+    const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
+    photos.push(`data:${mime};base64,${base64}`);
+  }
+  return photos;
 }
 
 // Sube un informe .docx ya confeccionado con esta misma aplicación y lo
