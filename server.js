@@ -1236,19 +1236,23 @@ app.patch('/registro/:id/lpu', requireLpuEditor, async (req, res) => {
   } catch (e) { console.error('PATCH /registro/:id/lpu:', e); res.status(500).json({ error: e.message || 'Error al editar LPU' }); }
 });
 
-// Reemplaza el texto de la celda de título de portada ("INFORME CORRECTIVO
-// CLIMA") dentro del .docx ya generado. Solo habilitado para los sitios Data
-// Center San Martín y Data Center Apoquindo (ver /registro/:id/titulo abajo).
-async function patchTituloDocx(buffer, newTitulo) {
+// Reemplaza el texto del título de portada (línea grande con el nombre del
+// sitio, ej. "DATA CENTER SAN MARTIN") dentro del .docx ya generado. Ese
+// texto es el único run de la portada con color COVER_BLUE (1F497D) y
+// tamaño 32 (ver coverLine(sitioNorm, { size: 32 }) al generar el informe),
+// lo que lo distingue del mismo nombre de sitio que aparece en la tabla
+// "Nombre de Sitio" del cuerpo del informe.
+async function patchTituloDocx(buffer, newTitulo, fallback) {
   const zip = await JSZip.loadAsync(buffer);
   const docPath = 'word/document.xml';
   const file = zip.file(docPath);
   if (!file) throw new Error('Documento inválido: falta word/document.xml');
   let xml = await file.async('string');
-  const value = (newTitulo || '').toString().trim() || 'INFORME CORRECTIVO CLIMA';
-  const re = /(<w:t[^>]*>)INFORME CORRECTIVO CLIMA(<\/w:t>)/;
+  const value = (newTitulo || '').toString().trim() || (fallback || '').toString().trim();
+  if (!value) throw new Error('El título de portada no puede estar vacío');
+  const re = /(<w:r>(?:(?!<\/w:r>)[\s\S])*?<w:color w:val="1F497D"\/>(?:(?!<\/w:r>)[\s\S])*?<w:sz w:val="32"\/>(?:(?!<\/w:r>)[\s\S])*?<w:t[^>]*>)([^<]*)(<\/w:t>)/;
   if (!re.test(xml)) throw new Error('No se encontró el título de portada en el documento');
-  xml = xml.replace(re, (_m, pre, post) => pre + escapeXml(value) + post);
+  xml = xml.replace(re, (_m, pre, _old, post) => pre + escapeXml(value) + post);
   zip.file(docPath, xml);
   return { buffer: await zip.generateAsync({ type: 'nodebuffer' }), value };
 }
@@ -1268,7 +1272,7 @@ app.patch('/registro/:id/titulo', requireLpuEditor, async (req, res) => {
       if (!fs.existsSync(fpath)) return res.status(404).json({ error: 'Archivo no existe' });
       buffer = fs.readFileSync(fpath);
     }
-    const { buffer: patched, value } = await patchTituloDocx(buffer, req.body && req.body.titulo);
+    const { buffer: patched, value } = await patchTituloDocx(buffer, req.body && req.body.titulo, sitio);
     fs.writeFileSync(fpath, patched);
     await storageUpload(patched, `clima/${entry.filename}`);
     res.json({ ok: true, titulo: value });

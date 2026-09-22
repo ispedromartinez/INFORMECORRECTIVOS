@@ -2204,7 +2204,8 @@ const TITULO_EDITABLE_SITIOS=new Set(['DATA CENTER SAN MARTIN','DATA CENTER APOQ
 let pendingTituloId=null;
 function editTitulo(id){
   pendingTituloId=id;
-  document.getElementById('tituloInput').value='INFORME CORRECTIVO CLIMA';
+  const rec=allRecords.find(x=>x.id===id);
+  document.getElementById('tituloInput').value=(rec&&rec.nombreSitio)?rec.nombreSitio.toUpperCase():'';
   document.getElementById('tituloModal').classList.add('open');
   setTimeout(()=>document.getElementById('tituloInput').focus(),50);
 }
