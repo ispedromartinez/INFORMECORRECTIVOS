@@ -1230,8 +1230,8 @@ async function datosParaEditar(entry) {
   return {
     datos: {
       ...extraidos,
-      direccion: entry.direccion || '', sala: entry.sala || '',
-      resumen: '', observaciones: '', tituloPortada: '', eqModelo: '',
+      direccion: entry.direccion || '', sala: extraidos.eqSala || entry.sala || '',
+      resumen: '', observaciones: '', tituloPortada: '',
       m_cv:'', m_ca:'', m_ev:'', m_ea:'', m_condv:'', m_conda:'', m_tinj:'', m_tret:'',
       ticketTE:'', ticketTI:'', ticketRED:'',
       photos: [], photoDescs: []
@@ -1303,7 +1303,7 @@ async function extractClimaFieldsFromDocx(buffer) {
     fecha: after(docTexts, 'Fecha Ejecución'),
     tecnico: after(docTexts, 'Técnico Ejecutante'),
     supervisor: after(docTexts, 'Supervisor'),
-    inc: '', numOT: '', equipo: '', circuito: '', tipoEquipo: '', marca: ''
+    inc: '', numOT: '', equipo: '', circuito: '', tipoEquipo: '', marca: '', eqSala: '', eqModelo: ''
   };
 
   const idxTk = docTexts.indexOf('Números de Tickets');
@@ -1313,9 +1313,11 @@ async function extractClimaFieldsFromDocx(buffer) {
   }
   const idxEq = docTexts.indexOf('DATOS GENERALES DEL EQUIPAMIENTO');
   if (idxEq >= 0) {
+    out.eqSala = clean(docTexts[idxEq + 6]);
     const eqCombinado = clean(docTexts[idxEq + 7]);
     out.tipoEquipo = clean(docTexts[idxEq + 8]);
     out.marca = clean(docTexts[idxEq + 9]);
+    out.eqModelo = clean(docTexts[idxEq + 10]);
     const m = eqCombinado.match(/^E(\S*)(?:\s+C(\S*))?$/i);
     if (m) { out.equipo = m[1] || ''; out.circuito = m[2] || ''; }
   }

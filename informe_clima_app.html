@@ -546,6 +546,12 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
 
 <div id="errToast" class="err-toast"></div>
 
+<div id="editSaveBar" style="display:none;position:fixed;right:18px;bottom:18px;z-index:500;background:#fff;border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:10px 12px;gap:8px;align-items:center">
+  <span style="font-size:12px;font-weight:700;color:#1a3a6c;margin-right:4px">✏️ Editando informe</span>
+  <button class="btn-gen" style="padding:10px 16px;font-size:13px" onclick="generateDocx()">💾 Guardar cambios</button>
+  <button class="cbtn cancel" style="padding:10px 14px;font-size:13px" onclick="cancelarEdicion()">✕ Cancelar</button>
+</div>
+
 <!-- ══ TAB 0: NUEVO ══ -->
 <div class="section active" id="tab0">
   <div class="nuevo-banner">
@@ -1538,6 +1544,7 @@ function nuevoInforme(){
   document.getElementById('statusMsg').style.display='none';
   lastInformeId=null;
   editingInformeId=null;editingCodInforme=null;
+  document.getElementById('editSaveBar').style.display='none';
   document.getElementById('btnVerPdf').style.display='none';
   document.querySelectorAll('.has-error').forEach(el=>el.classList.remove('has-error'));
   unlockedUpTo=1;
@@ -1878,6 +1885,7 @@ async function generateDocx(){
     lastInformeId=editId||resp.headers.get('X-Informe-Id');
     const _vp=document.getElementById('btnVerPdf'); if(_vp)_vp.style.display=lastInformeId?'block':'none';
     editingInformeId=null;editingCodInforme=null;
+    document.getElementById('editSaveBar').style.display='none';
     genSuccess(fname);
     setTimeout(()=>showTab(7),1100);
     loadHist();
@@ -2245,10 +2253,18 @@ async function editInformeCompleto(id){
 
     (d.photos||[]).forEach((url,i)=>{if(url)loadPhotoFromDataUrl(i,url,(d.photoDescs&&d.photoDescs[i])||'');});
 
+    // En modo edición se desbloquean todas las pestañas: no hace falta
+    // completar los campos obligatorios tab por tab para poder guardar.
+    unlockedUpTo=6;updateTabStates();
     toggleTituloPortada();previewCod();updateEstadoActual();buildSummary();
-    tigToast(j.parcial?'⚠️ Este informe es viejo: se leyó lo que se pudo del Word, completá lo que falte (fotos, resumen, mediciones)':'✏️ Modo edición activado — se sobrescribe el mismo informe al guardar','ok');
+    document.getElementById('editSaveBar').style.display='flex';
+    tigToast(j.parcial?'⚠️ Este informe es viejo: se leyó lo que se pudo del Word, completá lo que falte (fotos, resumen, mediciones)':'✏️ Modo edición activado — guardá desde cualquier pestaña con el botón flotante','ok');
     showTab(1);
   }catch(e){tigToast('❌ '+e.message,'err');}
+}
+function cancelarEdicion(){
+  nuevoInforme();
+  tigToast('Edición cancelada','ok');
 }
 
 // ══ SUBIR INFORME YA CONFECCIONADO (plmartinez) ══
