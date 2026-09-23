@@ -1704,34 +1704,56 @@ const REPORTE_COLUMNAS_EQUIPOS_GLOBAL = {
   tipoEquipo: 'Tipo de Equipo', marca: 'Marca', intervenciones: 'N° Intervenciones',
   promedioDias: 'Promedio Días entre Visitas', primeraFecha: 'Primera Intervención', ultimaFecha: 'Última Intervención'
 };
+// Agrupa registros por equipo (sitio+N°+circuito) y arma una fila resumen
+// por grupo: N° de intervenciones, promedio de días entre visitas, etc.
+function agruparPorEquipo(records) {
+  const grupos = new Map();
+  for (const r of records) {
+    const key = `${r.codigoSitio || ''}|||${r.equipo || ''}|||${r.circuito || ''}`;
+    if (!grupos.has(key)) grupos.set(key, []);
+    grupos.get(key).push(r);
+  }
+  return [...grupos.values()].map(items => {
+    const ordenados = items.slice().sort((a, b) => (parseFechaEjecucion(a.fecha) || new Date(a.fechaCreacion)) - (parseFechaEjecucion(b.fecha) || new Date(b.fechaCreacion)));
+    const fechas = ordenados.map(r => parseFechaEjecucion(r.fecha) || new Date(r.fechaCreacion));
+    let totalGap = 0, gaps = 0;
+    for (let i = 1; i < fechas.length; i++) { totalGap += Math.round((fechas[i] - fechas[i - 1]) / 86400000); gaps++; }
+    const ultimo = ordenados[ordenados.length - 1];
+    return {
+      nombreSitio: ultimo.nombreSitio, codigoSitio: ultimo.codigoSitio, equipo: ultimo.equipo, circuito: ultimo.circuito,
+      tipoEquipo: ultimo.tipoEquipo, marca: ultimo.marca, intervenciones: ordenados.length,
+      promedioDias: gaps ? Math.round(totalGap / gaps) : '—',
+      primeraFecha: ordenados[0].fecha, ultimaFecha: ultimo.fecha
+    };
+  }).sort((a, b) => (a.nombreSitio || '').localeCompare(b.nombreSitio || '') || String(a.equipo).localeCompare(String(b.equipo)));
+}
 app.post('/reporte-equipos-global', async (req, res) => {
   try {
     const all = (await dbClimaList(null)).filter(r => r.equipo);
     if (!all.length) return res.status(404).json({ error: 'No hay equipos registrados' });
-    const grupos = new Map();
-    for (const r of all) {
-      const key = `${r.codigoSitio || ''}|||${r.equipo || ''}|||${r.circuito || ''}`;
-      if (!grupos.has(key)) grupos.set(key, []);
-      grupos.get(key).push(r);
-    }
-    const rows = [...grupos.values()].map(items => {
-      const ordenados = items.slice().sort((a, b) => (parseFechaEjecucion(a.fecha) || new Date(a.fechaCreacion)) - (parseFechaEjecucion(b.fecha) || new Date(b.fechaCreacion)));
-      const fechas = ordenados.map(r => parseFechaEjecucion(r.fecha) || new Date(r.fechaCreacion));
-      let totalGap = 0, gaps = 0;
-      for (let i = 1; i < fechas.length; i++) { totalGap += Math.round((fechas[i] - fechas[i - 1]) / 86400000); gaps++; }
-      const ultimo = ordenados[ordenados.length - 1];
-      return {
-        nombreSitio: ultimo.nombreSitio, codigoSitio: ultimo.codigoSitio, equipo: ultimo.equipo, circuito: ultimo.circuito,
-        tipoEquipo: ultimo.tipoEquipo, marca: ultimo.marca, intervenciones: ordenados.length,
-        promedioDias: gaps ? Math.round(totalGap / gaps) : '—',
-        primeraFecha: ordenados[0].fecha, ultimaFecha: ultimo.fecha
-      };
-    }).sort((a, b) => (a.nombreSitio || '').localeCompare(b.nombreSitio || '') || String(a.equipo).localeCompare(String(b.equipo)));
+    const rows = agruparPorEquipo(all);
     const buffer = buildReporteExcel(REPORTE_COLUMNAS_EQUIPOS_GLOBAL, Object.keys(REPORTE_COLUMNAS_EQUIPOS_GLOBAL), rows, 'Equipos');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="reporte-equipos-global.xlsx"');
     res.send(buffer);
   } catch (e) { console.error('POST /reporte-equipos-global:', e); res.status(500).json({ error: e.message || 'Error al generar el reporte' }); }
+});
+
+// Reporte de todos los equipos de uno o varios sitios elegidos.
+app.post('/reporte-sitio', async (req, res) => {
+  try {
+    const codigoSitios = Array.isArray(req.body?.codigoSitios) ? req.body.codigoSitios.map(String) : [];
+    if (!codigoSitios.length) return res.status(400).json({ error: 'Falta seleccionar al menos un sitio' });
+    const set = new Set(codigoSitios);
+    const all = (await dbClimaList(null)).filter(r => r.equipo && set.has(String(r.codigoSitio || '')));
+    if (!all.length) return res.status(404).json({ error: 'No hay equipos registrados para el/los sitio(s) elegido(s)' });
+    const rows = agruparPorEquipo(all);
+    const buffer = buildReporteExcel(REPORTE_COLUMNAS_EQUIPOS_GLOBAL, Object.keys(REPORTE_COLUMNAS_EQUIPOS_GLOBAL), rows, 'Equipos');
+    const fname = codigoSitios.length > 1 ? 'reporte-sitios-multiple.xlsx' : `reporte-sitio-${sanitizeFnamePart(codigoSitios[0])}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+    res.send(buffer);
+  } catch (e) { console.error('POST /reporte-sitio:', e); res.status(500).json({ error: e.message || 'Error al generar el reporte' }); }
 });
 
 // ═══════════════════════════════════════════════════════════════

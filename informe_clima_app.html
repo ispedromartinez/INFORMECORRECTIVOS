@@ -402,6 +402,10 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
 .cbtn:disabled{opacity:.7;cursor:default;}
 .eqm-select{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 13px;font-size:14px;color:var(--text);background:#fff;font-family:inherit;}
 .eqm-select:disabled{background:#f4f5f7;color:var(--muted);cursor:not-allowed;}
+.eqm-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;min-height:1px;}
+.eqm-chip{display:inline-flex;align-items:center;gap:7px;background:var(--bl);color:var(--bd);font-size:12.5px;font-weight:700;padding:7px 8px 7px 12px;border-radius:20px;}
+.eqm-chip button{background:none;border:none;cursor:pointer;color:#94a3b8;font-size:15px;line-height:1;padding:2px;display:flex;}
+.eqm-chip button:hover{color:var(--red-tx,#dc2626);}
 .eqm-stats{display:flex;gap:10px;margin-bottom:14px;}
 .eqm-stat{flex:1;background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 10px;text-align:center;}
 .eqm-stat b{display:block;font-size:22px;font-weight:800;color:var(--tigo,#0073EA);}
@@ -945,17 +949,24 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
     </div>
     <button class="rep-mini" style="width:100%;margin-bottom:14px;padding:11px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:7px;" onclick="descargarReporteEquiposGlobal()">📋 Reporte global de todos los equipos</button>
     <div class="card" style="margin-bottom:14px;">
-      <div class="card-title">Ver un equipo puntual</div>
+      <div class="card-title">Ver por sitio o equipo puntual</div>
       <div class="row2">
         <div class="field" style="margin-bottom:0;"><label>Sitio</label>
           <select id="eqmSitio" class="eqm-select" onchange="onEqmSitioChange()"><option value="">Selecciona sitio...</option></select>
         </div>
         <div class="field" style="margin-bottom:0;"><label>Equipo</label>
-          <select id="eqmEquipo" class="eqm-select" onchange="onEqmEquipoChange()" disabled><option value="">Selecciona equipo...</option></select>
+          <select id="eqmEquipo" class="eqm-select" onchange="onEqmEquipoChange()" disabled><option value="">Todos los equipos</option></select>
         </div>
       </div>
+      <button class="rep-mini" id="btnRepSitioActual" style="width:100%;margin-top:12px;padding:10px;font-size:13px;display:none;align-items:center;justify-content:center;gap:7px;" onclick="descargarReporteSitioActual()">📥 Reporte de todos los equipos de este sitio</button>
     </div>
     <div id="eqmResultados"></div>
+    <div class="card" style="margin-bottom:0;">
+      <div class="card-title">Varios sitios a la vez</div>
+      <select id="eqmSitioAdd" class="eqm-select" onchange="addEqmSitioChip()"><option value="">+ Agregar sitio...</option></select>
+      <div id="eqmSitiosChips" class="eqm-chips"></div>
+      <button class="rep-mini" style="width:100%;margin-top:12px;padding:10px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:7px;" onclick="descargarReporteSitiosMulti()">📥 Reporte de sitios seleccionados</button>
+    </div>
   </div>
 </div>
 
@@ -2004,19 +2015,68 @@ function parseFechaEjecucion(fecha){
   return isNaN(d.getTime())?null:d;
 }
 function fechaOrdenable(r){return parseFechaEjecucion(r.fecha)||new Date(r.fechaCreacion);}
+function eqmSitiosList(){
+  return[...new Map(allRecords.filter(r=>r.equipo).map(r=>[r.codigoSitio,r.nombreSitio])).entries()]
+    .sort((a,b)=>(a[1]||'').localeCompare(b[1]||''));
+}
+let eqmSitiosSel=[];
+function renderEqmSitiosAdd(){
+  const sitios=eqmSitiosList().filter(([cod])=>!eqmSitiosSel.some(s=>s.cod===cod));
+  const sel=document.getElementById('eqmSitioAdd');
+  sel.innerHTML='<option value="">+ Agregar sitio...</option>'+sitios.map(([cod,nom])=>`<option value="${esc(cod)}">${esc(nom||cod)}</option>`).join('');
+}
+function renderEqmSitiosChips(){
+  const box=document.getElementById('eqmSitiosChips');
+  box.innerHTML=eqmSitiosSel.map(s=>`<span class="eqm-chip">${esc(s.nom||s.cod)}<button onclick="removeEqmSitioChip('${esc(s.cod)}')" title="Quitar">✕</button></span>`).join('');
+}
+function addEqmSitioChip(){
+  const sel=document.getElementById('eqmSitioAdd');
+  const cod=sel.value;
+  if(!cod)return;
+  const nom=(eqmSitiosList().find(([c])=>c===cod)||[])[1];
+  eqmSitiosSel.push({cod,nom});
+  renderEqmSitiosAdd();renderEqmSitiosChips();
+}
+function removeEqmSitioChip(cod){
+  eqmSitiosSel=eqmSitiosSel.filter(s=>s.cod!==cod);
+  renderEqmSitiosAdd();renderEqmSitiosChips();
+}
 function openEquipoModal(){
   const sel=document.getElementById('eqmSitio');
-  const sitios=[...new Map(allRecords.filter(r=>r.equipo).map(r=>[r.codigoSitio,r.nombreSitio])).entries()]
-    .sort((a,b)=>(a[1]||'').localeCompare(b[1]||''));
+  const sitios=eqmSitiosList();
   sel.innerHTML='<option value="">Selecciona sitio...</option>'+sitios.map(([cod,nom])=>`<option value="${esc(cod)}">${esc(nom||cod)}</option>`).join('');
-  document.getElementById('eqmEquipo').innerHTML='<option value="">Selecciona equipo...</option>';
+  document.getElementById('eqmEquipo').innerHTML='<option value="">Todos los equipos</option>';
   document.getElementById('eqmEquipo').disabled=true;
   document.getElementById('eqmResultados').innerHTML='';
+  document.getElementById('btnRepSitioActual').style.display='none';
+  eqmSitiosSel=[];
+  renderEqmSitiosAdd();renderEqmSitiosChips();
   document.getElementById('equipoModal').classList.add('open');
 }
 function closeEquipoModal(){document.getElementById('equipoModal').classList.remove('open');}
+async function descargarReporteSitioActual(){
+  const cod=document.getElementById('eqmSitio').value;
+  if(!cod)return;
+  await descargarReporteSitios([cod]);
+}
+async function descargarReporteSitiosMulti(){
+  const cods=eqmSitiosSel.map(s=>s.cod);
+  if(!cods.length){tigToast('Agrega al menos un sitio','err');return;}
+  await descargarReporteSitios(cods);
+}
+async function descargarReporteSitios(codigoSitios){
+  try{
+    const resp=await fetch(`${SERVER}/reporte-sitio`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codigoSitios})});
+    if(!resp.ok){const e=await resp.json();throw new Error(e.error||'Error del servidor');}
+    const blob=await resp.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=`reporte-sitio-${codigoSitios.length>1?'multiple':sanitizeClientFname(codigoSitios[0])}.xlsx`;a.click();URL.revokeObjectURL(url);
+  }catch(e){tigToast('❌ '+e.message,'err');}
+}
+function sanitizeClientFname(s){return String(s||'').replace(/[^a-zA-Z0-9_-]/g,'_');}
 function onEqmSitioChange(){
   const cod=document.getElementById('eqmSitio').value;
+  document.getElementById('btnRepSitioActual').style.display=cod?'flex':'none';
   const eqSel=document.getElementById('eqmEquipo');
   document.getElementById('eqmResultados').innerHTML='';
   if(!cod){eqSel.innerHTML='<option value="">Selecciona equipo...</option>';eqSel.disabled=true;return;}
