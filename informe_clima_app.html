@@ -323,6 +323,8 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
 .esb-cancel:active,.esb-save:active{transform:scale(.96);}
 @keyframes esbUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @media (max-width:480px){.edit-save-bar .esb-inner{flex-direction:column;align-items:stretch;}.esb-btns{margin-left:0;}.esb-cancel,.esb-save{flex:1;}}
+body.editing{padding-bottom:110px;}
+@media (max-width:480px){body.editing{padding-bottom:180px;}}
 
 /* ── MODAL ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px);}
@@ -1591,7 +1593,7 @@ function nuevoInforme(){
   document.getElementById('statusMsg').style.display='none';
   lastInformeId=null;
   editingInformeId=null;editingCodInforme=null;draftSuspended=false;
-  document.getElementById('editSaveBar').style.display='none';
+  document.getElementById('editSaveBar').style.display='none';document.body.classList.remove('editing');
   document.getElementById('btnVerPdf').style.display='none';
   document.querySelectorAll('.has-error').forEach(el=>el.classList.remove('has-error'));
   unlockedUpTo=1;
@@ -1934,7 +1936,7 @@ async function generateDocx(){
     lastInformeId=editId||resp.headers.get('X-Informe-Id');
     const _vp=document.getElementById('btnVerPdf'); if(_vp)_vp.style.display=lastInformeId?'block':'none';
     editingInformeId=null;editingCodInforme=null;
-    document.getElementById('editSaveBar').style.display='none';
+    document.getElementById('editSaveBar').style.display='none';document.body.classList.remove('editing');
     clearDraft();draftSuspended=true;
     genSuccess(editId?'Informe actualizado':fname);
     setTimeout(()=>showTab(7),1100);
@@ -2358,7 +2360,7 @@ async function editInformeCompleto(id){
     // completar los campos obligatorios tab por tab para poder guardar.
     unlockedUpTo=6;updateTabStates();
     toggleTituloPortada();previewCod();updateEstadoActual();buildSummary();
-    document.getElementById('editSaveBar').style.display='block';
+    document.getElementById('editSaveBar').style.display='block';document.body.classList.add('editing');
     tigToast(j.parcial?'⚠️ Este informe es viejo: se leyó lo que se pudo del Word, completá lo que falte (fotos, resumen, mediciones)':'✏️ Modo edición activado — guardá desde cualquier pestaña con el botón flotante','ok');
     showTab(1);
   }catch(e){tigToast('❌ '+e.message,'err');}
