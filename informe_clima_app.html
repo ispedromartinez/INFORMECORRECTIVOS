@@ -955,7 +955,7 @@ code{background:#f1f5f9;padding:2px 7px;border-radius:4px;font-size:12px;}
           <select id="eqmSitio" class="eqm-select" onchange="onEqmSitioChange()"><option value="">Selecciona sitio...</option></select>
         </div>
         <div class="field" style="margin-bottom:0;"><label>Equipo</label>
-          <select id="eqmEquipo" class="eqm-select" onchange="onEqmEquipoChange()" disabled><option value="">Todos los equipos</option></select>
+          <select id="eqmEquipo" class="eqm-select" onchange="onEqmEquipoChange()" disabled><option value="">Selecciona equipo...</option></select>
         </div>
       </div>
       <button class="rep-mini" id="btnRepSitioActual" style="width:100%;margin-top:12px;padding:10px;font-size:13px;display:none;align-items:center;justify-content:center;gap:7px;" onclick="descargarReporteSitioActual()">📥 Reporte de todos los equipos de este sitio</button>
@@ -1590,7 +1590,7 @@ function nuevoInforme(){
   previewCod();
   document.getElementById('statusMsg').style.display='none';
   lastInformeId=null;
-  editingInformeId=null;editingCodInforme=null;
+  editingInformeId=null;editingCodInforme=null;draftSuspended=false;
   document.getElementById('editSaveBar').style.display='none';
   document.getElementById('btnVerPdf').style.display='none';
   document.querySelectorAll('.has-error').forEach(el=>el.classList.remove('has-error'));
@@ -1935,7 +1935,7 @@ async function generateDocx(){
     const _vp=document.getElementById('btnVerPdf'); if(_vp)_vp.style.display=lastInformeId?'block':'none';
     editingInformeId=null;editingCodInforme=null;
     document.getElementById('editSaveBar').style.display='none';
-    clearDraft();
+    clearDraft();draftSuspended=true;
     genSuccess(editId?'Informe actualizado':fname);
     setTimeout(()=>showTab(7),1100);
     loadHist();
@@ -1999,6 +1999,7 @@ async function loadHist(silent=false){
     const q=document.getElementById('histSearch')?.value||'';
     const url=q?`${SERVER}/registro?q=${encodeURIComponent(q)}`:SERVER+'/registro';
     const r=await fetch(url,{cache:'no-store'});allRecords=await r.json();renderHist(allRecords);
+    dropDraftIfGenerated();
   }catch{
     if(!silent)document.getElementById('histList').innerHTML='<div class="hist-empty"><div class="ei">⚠️</div><p>No se pudo conectar al servidor.<br><strong>Ejecuta: node server.js</strong></p></div>';
   }
@@ -2027,7 +2028,7 @@ function renderEqmSitiosAdd(){
 }
 function renderEqmSitiosChips(){
   const box=document.getElementById('eqmSitiosChips');
-  box.innerHTML=eqmSitiosSel.map(s=>`<span class="eqm-chip">${esc(s.nom||s.cod)}<button onclick="removeEqmSitioChip('${esc(s.cod)}')" title="Quitar">✕</button></span>`).join('');
+  box.innerHTML=eqmSitiosSel.map(s=>`<span class="eqm-chip">${esc(s.nom||s.cod)}<button data-cod="${esc(s.cod)}" onclick="removeEqmSitioChip(this.dataset.cod)" title="Quitar">✕</button></span>`).join('');
 }
 function addEqmSitioChip(){
   const sel=document.getElementById('eqmSitioAdd');
@@ -2045,7 +2046,7 @@ function openEquipoModal(){
   const sel=document.getElementById('eqmSitio');
   const sitios=eqmSitiosList();
   sel.innerHTML='<option value="">Selecciona sitio...</option>'+sitios.map(([cod,nom])=>`<option value="${esc(cod)}">${esc(nom||cod)}</option>`).join('');
-  document.getElementById('eqmEquipo').innerHTML='<option value="">Todos los equipos</option>';
+  document.getElementById('eqmEquipo').innerHTML='<option value="">Selecciona equipo...</option>';
   document.getElementById('eqmEquipo').disabled=true;
   document.getElementById('eqmResultados').innerHTML='';
   document.getElementById('btnRepSitioActual').style.display='none';
@@ -2602,9 +2603,11 @@ function collectDraftData(){
     savedAt:Date.now()
   };
 }
+// Tras generar, el form queda lleno: sin esto el autoguardado recrearía el borrador.
+let draftSuspended=false;
 function clearDraft(){try{localStorage.removeItem(DRAFT_KEY);}catch{}}
 function saveDraftIfNeeded(){
-  if(editingInformeId)return;
+  if(editingInformeId||draftSuspended)return;
   const d=collectDraftData();
   if(!d.nombreSitio&&!d.tecnico){clearDraft();return;}
   try{localStorage.setItem(DRAFT_KEY,JSON.stringify(d));}catch{}
@@ -2618,9 +2621,20 @@ function checkDraft(){
   document.getElementById('draftInfo').innerHTML=`<strong>Sitio:</strong> ${esc(d.nombreSitio||'—')} · <strong>Equipo:</strong> ${esc(d.equipo||'—')} · <strong>Circuito:</strong> ${esc(d.circuito||'—')} · <strong>Técnico:</strong> ${esc(d.tecnico||'—')}`;
   document.getElementById('draftBanner').style.display='flex';
 }
+function dropDraftIfGenerated(){
+  const d=readDraft();
+  if(!d)return;
+  const ini=fmtDate(d.fechaEjecucion),term=fmtDate(d.fechaTermino);
+  const fecha=term?`${ini} - ${term}`:ini;
+  const hecho=allRecords.some(r=>(r.nombreSitio||'')===(d.nombreSitio||'')&&String(r.equipo||'')===String(d.equipo||'')&&String(r.circuito||'')===String(d.circuito||'')&&(r.fecha||'')===fecha);
+  if(!hecho)return;
+  clearDraft();
+  document.getElementById('draftBanner').style.display='none';
+}
 function resumeDraft(){
   const d=readDraft();
   if(!d)return;
+  draftSuspended=false;
   document.getElementById('nombreSitio').value=d.nombreSitio||'';
   siteInput.value=d.nombreSitio||'';
   siteInput.classList.toggle('sel',!!d.nombreSitio);
