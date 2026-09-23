@@ -1773,23 +1773,6 @@ const { list: dbWomList, insert: dbWomInsert, find: dbWomFind, remove: dbWomDele
   delCol: 'deleted_at', delKey: 'deletedAt'
 });
 
-const RSO_SITES = {
-  'RSO CONCEPCION':   'ANIBAL PINTO 105, CONCEPCION',
-  'RSO ANTOFAGASTA':  'FELIX GARCIA 581, ANTOFAGASTA',
-  'RSO PUERTO MONTT': 'AV LO CELIS S/N PUERTO MONTT',
-  'RSO PUNTA ARENAS': 'AV PDTE EDUARDO FREI MONTALVA 5, PUNTA ARENAS',
-  'MSO ROSAS':        'ROSAS 2451, SANTIAGO CENTRO',
-  'MSO QUILICURA':    'AV CAÑAVERAL 34, QUILICURA'
-};
-
-const ACTIVIDADES_WOM = [
-  'Trabajo Correctivo',
-  'Mantenimiento preventivo',
-  'Atención de emergencia',
-  'Inspección',
-  'Retiro de equipos'
-];
-
 async function buildDocxWom(d) {
   const v  = s => (s||'').toString().trim();
 
@@ -2109,9 +2092,6 @@ async function buildDocxWom(d) {
 }
 
 // ── WOM Routes ─────────────────────────────────────────────────
-app.get('/sitios-rso', (_req, res) => res.json(RSO_SITES));
-app.get('/actividades-wom', (_req, res) => res.json(ACTIVIDADES_WOM));
-
 app.post('/generar-wom', heavyLimiter, async (req, res) => {
   try {
     const d = req.body;
