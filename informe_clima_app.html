@@ -246,6 +246,13 @@ input.has-error,textarea.has-error{border-color:#ef4444!important;background:#ff
 .stat-num{font-size:26px;font-weight:800;color:var(--blue);}
 .stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:4px;font-weight:600;}
 .hist-empty{text-align:center;padding:48px 20px;color:var(--muted);}
+.hist-pager{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:14px;}
+.hist-pager button{min-width:36px;height:36px;padding:0 10px;border:1.5px solid var(--border);border-radius:9px;background:#fff;color:var(--bm);font:inherit;font-size:13px;font-weight:600;cursor:pointer;}
+.hist-pager button:hover:not(:disabled){border-color:var(--bm);}
+.hist-pager button.on{background:var(--bm);border-color:var(--bm);color:#fff;}
+.hist-pager button:disabled{opacity:.4;cursor:default;}
+.hist-pager .pg-dots{color:var(--muted);padding:0 2px;}
+.hist-pager .pg-info{width:100%;text-align:center;font-size:12px;color:var(--muted);margin-top:4px;}
 .hist-empty .ei{font-size:44px;margin-bottom:12px;}
 .inf-card{background:var(--white);border-radius:10px;box-shadow:var(--sh);margin-bottom:10px;overflow:hidden;border-left:3px solid var(--bl);transition:box-shadow .15s,border-color .15s;}
 .inf-card:hover{box-shadow:var(--sh-lg);border-left-color:var(--blue);}
@@ -852,6 +859,7 @@ body.editing{padding-bottom:110px;}
     <div class="stat-box"><div class="stat-num" id="sSitios">0</div><div class="stat-lbl">Sitios</div></div>
   </div>
   <div id="histList"></div>
+  <div id="histPager" class="hist-pager"></div>
   <div class="actions" style="margin-top:16px;">
     <button class="btn btn-secondary" onclick="showTab(0)">← Inicio</button>
   </div>
@@ -1019,6 +1027,8 @@ body.editing{padding-bottom:110px;}
 <script>
 const SERVER=window.location.origin;
 let serverOnline=false, allRecords=[], pendingDeleteId=null, lastInformeId=null;
+const HIST_PAGE_SIZE=10;
+let histPage=1, histRecords=[];
 
 // ══ SUPERVISORS list ══
 const SUPERVISORS=[
@@ -2145,6 +2155,7 @@ async function descargarReporteEquiposGlobal(){
 document.getElementById('equipoModal').addEventListener('click',function(e){if(e.target===this)closeEquipoModal();});
 
 function filterHist(q){
+  histPage=1;
   if(!q){renderHist(allRecords);return;}
   const nq=norm(q);
   renderHist(allRecords.filter(r=>norm(r.nombreSitio||'').includes(nq)||norm(r.codInforme||'').includes(nq)||norm(r.tecnico||'').includes(nq)||norm(r.numOT||'').includes(nq)));
@@ -2247,11 +2258,16 @@ function renderHist(records){
   document.getElementById('sSitios').textContent=sitios;
   document.getElementById('histTabNum').textContent=allRecords.length||'0';
   const list=document.getElementById('histList');
+  histRecords=records;
+  const pages=Math.max(1,Math.ceil(records.length/HIST_PAGE_SIZE));
+  histPage=Math.min(Math.max(1,histPage),pages);
+  renderHistPager(records.length,pages);
   if(!records.length){
     list.innerHTML=`<div class="hist-empty"><div class="ei">${allRecords.length?'🔍':'📂'}</div><p>${allRecords.length?'No hay resultados.':'Aún no hay informes. Crea tu primer informe.'}</p></div>`;
     return;
   }
-  list.innerHTML=records.map(r=>{
+  const start=(histPage-1)*HIST_PAGE_SIZE;
+  list.innerHTML=records.slice(start,start+HIST_PAGE_SIZE).map(r=>{
     const fc=r.fechaCreacion?new Date(r.fechaCreacion):null;
     const dateStr=fc?fc.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
     const photos=r.photoCount||0;
@@ -2286,6 +2302,27 @@ function renderHist(records){
       </div>
     </div>`;
   }).join('');
+}
+// Paginador del historial: 10 informes por página. Muestra primera, última
+// y las vecinas a la actual; el resto se colapsa en "…".
+function renderHistPager(total,pages){
+  const pager=document.getElementById('histPager');
+  if(pages<=1){pager.innerHTML='';return;}
+  const nums=[];
+  for(let i=1;i<=pages;i++){
+    if(i===1||i===pages||Math.abs(i-histPage)<=1)nums.push(i);
+    else if(nums[nums.length-1]!=='…')nums.push('…');
+  }
+  const start=(histPage-1)*HIST_PAGE_SIZE+1, end=Math.min(histPage*HIST_PAGE_SIZE,total);
+  pager.innerHTML=`<button onclick="goHistPage(${histPage-1})" ${histPage===1?'disabled':''} aria-label="Página anterior">‹</button>`
+    +nums.map(n=>n==='…'?'<span class="pg-dots">…</span>':`<button class="${n===histPage?'on':''}" onclick="goHistPage(${n})">${n}</button>`).join('')
+    +`<button onclick="goHistPage(${histPage+1})" ${histPage===pages?'disabled':''} aria-label="Página siguiente">›</button>`
+    +`<div class="pg-info">${start}–${end} de ${total} informes</div>`;
+}
+function goHistPage(n){
+  histPage=n;
+  renderHist(histRecords);
+  document.getElementById('histList').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function toggleInf(id){document.getElementById(`body_${id}`).classList.toggle('open');}
 async function downloadRecord(id){const a=document.createElement('a');a.href=`${SERVER}/descargar/${id}`;a.click();}
